@@ -135,6 +135,48 @@ const server = http.createServer((req, res) => {
   }
 });
 
+// ---------- websocket upgrade ----------
+server.on('upgrade', (req, socket) => {
+  const key = req.headers['sec-websocket-key'];
+  if (!key) { socket.destroy(); return; }
+  socket.write(
+    'HTTP/1.1 101 Switching Protocols\r\n' +
+    'Upgrade: websocket\r\nConnection: Upgrade\r\n' +
+    'Sec-WebSocket-Accept: ' + computeAcceptKey(key) + '\r\n\r\n');
+  clients.add(socket);
+  touch();
+  socket.write(encodeFrame(OPCODES.TEXT, Buffer.from(currentSnapshot())));
+  let buf = Buffer.alloc(0);
+  socket.on('data', data => {
+    touch();
+    buf = Buffer.concat([buf, data]);
+    while (true) {
+      let frame;
+      try { frame = decodeFrame(buf); } catch { socket.destroy(); return; }
+      if (!frame) break;
+      buf = buf.slice(frame.bytesConsumed);
+      if (frame.opcode === OPCODES.CLOSE) { socket.end(); return; }
+      if (frame.opcode === OPCODES.PING) socket.write(encodeFrame(OPCODES.PONG, frame.payload));
+    }
+  });
+  const drop = () => clients.delete(socket);
+  socket.on('close', drop);
+  socket.on('error', drop);
+});
+
+// ---------- snapshot file watch ----------
+let lastMtime = 0;
+try { lastMtime = fs.statSync(SNAPSHOT_FILE).mtimeMs; } catch {}
+setInterval(() => {
+  let stat;
+  try { stat = fs.statSync(SNAPSHOT_FILE); } catch { return; }
+  if (stat.mtimeMs === lastMtime) return;
+  lastMtime = stat.mtimeMs;
+  touch();
+  try { fs.writeFileSync(EVENTS_FILE, ''); } catch {}
+  broadcast(currentSnapshot());
+}, 500).unref();
+
 // ---------- lifecycle ----------
 function shutdown(code) {
   try { fs.writeFileSync(STOPPED_FILE, ''); } catch {}
