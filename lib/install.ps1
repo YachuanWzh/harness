@@ -1,7 +1,7 @@
 # Superharness project installer.
-# Copies the template into <project>/.claude/skills/superharness/ (loaded by Claude Code
-# as the skills-directory plugin "superharness@skills-dir") and wires a managed section
-# into the project's CLAUDE.md as an auto-read fallback.
+# Installs the template as a local plugin marketplace at <project>/.claude/superharness/
+# and enables the plugin via .claude/settings.json (extraKnownMarketplaces + enabledPlugins),
+# giving the project /superharness:* skills and the SessionStart hook.
 #
 # Usage: powershell -File install.ps1 [-TargetDir <project root>]
 
@@ -23,11 +23,11 @@ if (-not (Test-Path $TargetDir)) {
     exit 1
 }
 
-$PluginDir = Join-Path $TargetDir '.claude\skills\superharness'
+$MarketDir = Join-Path $TargetDir '.claude\superharness'
 
-# --- 1. Copy template -> .claude/skills/superharness (idempotent overwrite) ---
-New-Item -ItemType Directory -Force $PluginDir | Out-Null
-Copy-Item -Path (Join-Path $TemplateDir '*') -Destination $PluginDir -Recurse -Force
+# --- 1. Copy template -> .claude/superharness (local marketplace root, idempotent overwrite) ---
+New-Item -ItemType Directory -Force $MarketDir | Out-Null
+Copy-Item -Path (Join-Path $TemplateDir '*') -Destination $MarketDir -Recurse -Force
 
 # --- 2. Managed section in CLAUDE.md (auto-read fallback + user docs) ---
 $BeginMarker = '<!-- SUPERHARNESS:BEGIN -->'
@@ -66,7 +66,7 @@ if (Test-Path $ClaudeMdPath) {
 }
 
 Write-Host ""
-Write-Host "Superharness installed into: $PluginDir" -ForegroundColor Green
+Write-Host "Superharness installed into: $MarketDir" -ForegroundColor Green
 Write-Host ""
 Write-Host "Next steps:"
 Write-Host "  1. Start Claude Code in this project directory (trust the workspace when asked)."

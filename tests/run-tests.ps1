@@ -34,7 +34,8 @@ function Invoke-Installer {
     return $LASTEXITCODE
 }
 
-function Get-PluginDir { param([string]$ProjectDir) Join-Path $ProjectDir '.claude\skills\superharness' }
+function Get-MarketDir { param([string]$ProjectDir) Join-Path $ProjectDir '.claude\superharness' }
+function Get-PluginDir { param([string]$ProjectDir) Join-Path $ProjectDir '.claude\superharness\plugins\superharness' }
 
 Write-Host "`n=== Superharness test suite ===" -ForegroundColor Cyan
 
@@ -45,7 +46,7 @@ $exit = Invoke-Installer -TargetDir $proj
 $plugin = Get-PluginDir $proj
 
 Assert-True ($exit -eq 0) "installer exits with code 0"
-Assert-True (Test-Path (Join-Path $plugin '.claude-plugin\plugin.json')) "creates .claude-plugin/plugin.json (skills-dir plugin manifest)"
+Assert-True (Test-Path (Join-Path $plugin '.claude-plugin\plugin.json')) "creates plugin manifest under plugins/superharness/.claude-plugin/"
 
 $manifestOk = $false; $manifestName = ''
 try {
@@ -58,6 +59,21 @@ Assert-True ($manifestName -eq 'superharness') "plugin.json name is 'superharnes
 Assert-True (Test-Path (Join-Path $plugin 'HARNESS.md')) "creates HARNESS.md bootstrap document"
 $harness = if (Test-Path (Join-Path $plugin 'HARNESS.md')) { Get-Content (Join-Path $plugin 'HARNESS.md') -Raw } else { '' }
 Assert-True ($harness -match 'TDD|test-driven') "HARNESS.md mandates TDD"
+
+# ---------------------------------------------------------------- Test group 1.5: marketplace layout
+Write-Host "`n[1.5] Installer creates a local directory marketplace"
+$market = Get-MarketDir $proj
+$mpJsonPath = Join-Path $market '.claude-plugin\marketplace.json'
+Assert-True (Test-Path $mpJsonPath) "creates .claude-plugin/marketplace.json at marketplace root"
+$mpOk = $false; $mpName = ''; $mpSrc = ''
+try {
+    $mp = Get-Content $mpJsonPath -Raw | ConvertFrom-Json
+    $mpOk = $true; $mpName = $mp.name; $mpSrc = $mp.plugins[0].source
+} catch {}
+Assert-True $mpOk "marketplace.json is valid JSON"
+Assert-True ($mpName -eq 'superharness') "marketplace name is 'superharness'"
+Assert-True ($mpSrc -eq './plugins/superharness') "marketplace lists plugin source ./plugins/superharness"
+Assert-True (-not (Test-Path (Join-Path $proj '.claude\skills\superharness'))) "does not install to legacy .claude/skills/superharness path"
 
 # ---------------------------------------------------------------- Test group 2: skills
 Write-Host "`n[2] Installer copies the go skill and the core engineering skills"
