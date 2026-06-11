@@ -163,3 +163,12 @@ test('idle server exits and writes server-stopped', async t => {
   assert.ok(fs.existsSync(path.join(session, 'state', 'server-stopped')), 'server-stopped marker written');
   assert.ok(!fs.existsSync(path.join(session, 'state', 'server-info')), 'server-info removed');
 });
+
+test('mind map page contains pan/zoom and click feedback wiring', async t => {
+  const { info } = await startServer(t);
+  const html = await (await fetch(info.url + '/')).text();
+  assert.match(html, /wheel/);          // zoom
+  assert.match(html, /pointerdown/);    // pan
+  assert.match(html, /node:click/);     // feedback event
+  assert.match(html, /WebSocket/);      // live updates
+});
