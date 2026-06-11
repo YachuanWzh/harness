@@ -29,7 +29,34 @@ $MarketDir = Join-Path $TargetDir '.claude\superharness'
 New-Item -ItemType Directory -Force $MarketDir | Out-Null
 Copy-Item -Path (Join-Path $TemplateDir '*') -Destination $MarketDir -Recurse -Force
 
-# --- 2. Managed section in CLAUDE.md (auto-read fallback + user docs) ---
+# --- 2. Merge .claude/settings.json (preserving existing keys) ---
+$utf8 = New-Object System.Text.UTF8Encoding($false)
+
+function Set-Member {
+    param($Object, [string]$Name, $Value)
+    if ($Object.PSObject.Properties[$Name]) { $Object.$Name = $Value }
+    else { $Object | Add-Member -NotePropertyName $Name -NotePropertyValue $Value }
+}
+
+$SettingsPath = Join-Path $TargetDir '.claude\settings.json'
+$settings = if (Test-Path $SettingsPath) {
+    [IO.File]::ReadAllText($SettingsPath, $utf8) | ConvertFrom-Json
+} else { New-Object PSObject }
+
+$shMarket = '{"source":{"source":"directory","path":".claude/superharness"}}' | ConvertFrom-Json
+if (-not $settings.PSObject.Properties['extraKnownMarketplaces']) {
+    Set-Member $settings 'extraKnownMarketplaces' (New-Object PSObject)
+}
+Set-Member $settings.extraKnownMarketplaces 'superharness' $shMarket
+
+if (-not $settings.PSObject.Properties['enabledPlugins']) {
+    Set-Member $settings 'enabledPlugins' (New-Object PSObject)
+}
+Set-Member $settings.enabledPlugins 'superharness@superharness' $true
+
+[IO.File]::WriteAllText($SettingsPath, ($settings | ConvertTo-Json -Depth 16), $utf8)
+
+# --- 3. Managed section in CLAUDE.md (auto-read fallback + user docs) ---
 $BeginMarker = '<!-- SUPERHARNESS:BEGIN -->'
 $EndMarker   = '<!-- SUPERHARNESS:END -->'
 
@@ -49,7 +76,6 @@ $EndMarker
 "@
 
 $ClaudeMdPath = Join-Path $TargetDir 'CLAUDE.md'
-$utf8 = New-Object System.Text.UTF8Encoding($false)
 
 if (Test-Path $ClaudeMdPath) {
     $existing = [IO.File]::ReadAllText($ClaudeMdPath, $utf8)

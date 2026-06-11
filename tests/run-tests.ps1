@@ -75,6 +75,38 @@ Assert-True ($mpName -eq 'superharness') "marketplace name is 'superharness'"
 Assert-True ($mpSrc -eq './plugins/superharness') "marketplace lists plugin source ./plugins/superharness"
 Assert-True (-not (Test-Path (Join-Path $proj '.claude\skills\superharness'))) "does not install to legacy .claude/skills/superharness path"
 
+# ---------------------------------------------------------------- Test group 1.6: settings.json merge
+Write-Host "`n[1.6] Installer enables the plugin via .claude/settings.json"
+$settingsPath = Join-Path $proj '.claude\settings.json'
+Assert-True (Test-Path $settingsPath) "creates .claude/settings.json"
+$stOk = $false; $srcType = ''; $srcPath = ''; $enabled = $null
+try {
+    $st = Get-Content $settingsPath -Raw | ConvertFrom-Json
+    $stOk = $true
+    $srcType = $st.extraKnownMarketplaces.superharness.source.source
+    $srcPath = $st.extraKnownMarketplaces.superharness.source.path
+    $enabled = $st.enabledPlugins.'superharness@superharness'
+} catch {}
+Assert-True $stOk "settings.json is valid JSON"
+Assert-True ($srcType -eq 'directory') "extraKnownMarketplaces.superharness uses a directory source"
+Assert-True ($srcPath -eq '.claude/superharness') "marketplace path is .claude/superharness"
+Assert-True ($enabled -eq $true) "enabledPlugins['superharness@superharness'] is true"
+
+# preserve existing settings keys
+$proj3 = New-TempProject
+New-Item -ItemType Directory -Force (Join-Path $proj3 '.claude') | Out-Null
+Set-Content -Path (Join-Path $proj3 '.claude\settings.json') -Value '{"model":"opus","enabledPlugins":{"other@mp":true}}' -Encoding utf8
+Invoke-Installer -TargetDir $proj3 | Out-Null
+$st3 = Get-Content (Join-Path $proj3 '.claude\settings.json') -Raw | ConvertFrom-Json
+Assert-True ($st3.model -eq 'opus') "existing settings keys are preserved"
+Assert-True ($st3.enabledPlugins.'other@mp' -eq $true) "existing enabledPlugins entries are preserved"
+Assert-True ($st3.enabledPlugins.'superharness@superharness' -eq $true) "superharness entry added alongside existing ones"
+
+# idempotency
+Invoke-Installer -TargetDir $proj3 | Out-Null
+$st3b = Get-Content (Join-Path $proj3 '.claude\settings.json') -Raw | ConvertFrom-Json
+Assert-True ($st3b.enabledPlugins.'superharness@superharness' -eq $true) "second install keeps settings valid and enabled"
+
 # ---------------------------------------------------------------- Test group 2: skills
 Write-Host "`n[2] Installer copies the go skill and the core engineering skills"
 Assert-True (Test-Path (Join-Path $plugin 'skills\go\SKILL.md')) "creates skills/go/SKILL.md (/superharness:go entry point)"
@@ -166,7 +198,7 @@ Write-Host "`n[6] CLI entry point"
 Assert-True (Test-Path (Join-Path $RepoRoot 'bin\superharness.cmd')) "bin/superharness.cmd exists (PATH-callable from cmd and PowerShell)"
 
 # ---------------------------------------------------------------- cleanup + summary
-Remove-Item $proj, $proj2, $emptyDir -Recurse -Force -ErrorAction SilentlyContinue
+Remove-Item $proj, $proj2, $proj3, $emptyDir -Recurse -Force -ErrorAction SilentlyContinue
 
 Write-Host "`n=== Results: $script:Passed passed, $script:Failed failed ===" -ForegroundColor Cyan
 if ($script:Failed -gt 0) {
