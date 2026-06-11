@@ -1,0 +1,5 @@
+# superharness 本地运行时产物
+.superharness/
+# dogfood 安装产物（本仓库自装时生成）
+.claude/superharness/
+.claude/settings.local.json
