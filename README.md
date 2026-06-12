@@ -35,6 +35,23 @@ superharness
 | `.claude\settings.json` 中的 `extraKnownMarketplaces` + `enabledPlugins` | 自动注册并启用该 marketplace 的插件（保留性合并，不破坏已有配置） |
 | `CLAUDE.md` 中的 SUPERHARNESS 标记段 | Claude Code 自动读取的兜底指引（已有内容会被保留，重复执行不会重复追加） |
 
+#### 技术栈模板（可选）
+
+初始化时可附带 `--template` 为项目注入对应技术栈的工程纪律指引（经 SessionStart 钩子每会话注入）：
+
+```cmd
+superharness --template=frontend            :: 默认 React
+superharness --template=frontend --stack=vue
+superharness --template=backend             :: 默认 Python
+superharness --template=backend --stack=java
+superharness --template=backend --stack=node
+superharness --template=fullstack           :: 固定 React + Python（不接受 --stack）
+```
+
+合法 `--stack`：前端 `react|vue`，后端 `python|java|node`。指引文档随插件下发于
+`plugins\superharness\stacks\*.md`，选中的一份会被写入 `.claude\superharness\STACK.md`；
+不带 `--template` 的普通初始化不写该文件（已有的会被移除）。
+
 ### 2. 启动 Claude Code
 
 在该项目目录运行 `claude`（首次需在信任弹窗中信任工作区）。此后：
