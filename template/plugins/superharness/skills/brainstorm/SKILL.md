@@ -131,6 +131,33 @@ always refer to the current screen. Missing file = no browser interaction.
 The last click is usually the user's choice, but the terminal answer always wins
 on conflict.
 
+### Browser → Claude: read `<state_dir>/edits` (JSONL)
+
+Node `label`/`note` edits and the submit marker land here. Unlike `events`, this file
+is **NOT cleared on snapshot push** — it persists until you merge and clear it.
+
+```json
+{"type":"node:edit","id":"q1-a","label":"新标签","note":"新备注","timestamp":1760000000}
+{"type":"submit","timestamp":1760000005}
+```
+
+Only `label` and `note` are editable. Same `id` later in the file wins.
+
+### Edit round — pull browser edits into the design
+
+When you invite the user to edit node text:
+
+1. Tell them: 去浏览器双击节点改 label/note，逐个保存，改完点顶栏「提交」。
+2. Do NOT end the turn. Block-wait for a `{"type":"submit"}` line in
+   `<state_dir>/edits` using `Monitor` (fall back to `ScheduleWakeup`, ≤60s, if
+   `Monitor` is unavailable). This only works while you are parked in this wait.
+3. On submit: read `<state_dir>/edits`, take all `node:edit` lines (same `id` later
+   wins), apply each `label`/`note` onto the current snapshot tree by `id`; ignore
+   ids no longer present.
+4. If a browser edit conflicts with what the terminal dialogue concluded for that
+   node, ask in the terminal which wins.
+5. Rewrite `<content_dir>/mindmap.json` (`rev` + 1), then clear `<state_dir>/edits`.
+
 ## Red Flags
 
 | Thought | Reality |
@@ -139,3 +166,4 @@ on conflict.
 | "一次问三个问题快一点" | 一次一个问题。 |
 | "设计批了，顺手开始写代码" | 终点是设计文档 + 提示 /superharness:go。 |
 | "脑图更新太频繁，攒一批再推" | 每个问题/决策都推送，实时性就是这个技能的价值。 |
+| "用户在浏览器改了就直接采纳" | label/note 编辑要等「提交」，且与终端结论冲突时当面确认。 |
