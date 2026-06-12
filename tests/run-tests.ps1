@@ -478,6 +478,41 @@ Assert-True (@($t1b.rounds)[1].n -eq 2) "second round is numbered 2"
 
 Remove-Item $c1, $c2, $c3 -Recurse -Force -ErrorAction SilentlyContinue
 
+# ---------------------------------------------------------------- Test group 14: Stop hook failure + close
+Write-Host "`n[14] stop.ps1 records failures and closes the task"
+$stopF = Join-Path $plugin 'hooks\stop.ps1'
+
+# 14a. failure round -> failing_tests + query only, no full-dialogue blob
+$cf = New-TempProject
+New-TraceState -Cwd $cf `
+    -Task @{ task_id='f1'; slug='f1'; goal='G'; started_at='2026-06-12T10:00:00+08:00' } `
+    -Prompt @{ ts='2026-06-12T10:02:00+08:00'; query='make it pass' } `
+    -Outcome @{ outcome='failure'; test_command='npm test';
+                failing_tests=@(@{ name='adds two numbers'; file='sum.test.js'; message='expected 3 got 5' });
+                notes='off-by-two' }
+Invoke-HookJson $stopF @{ cwd=$cf; session_id='sf' } | Out-Null
+$tF = Get-Content (Join-Path $cf 'superharness\trace\f1.json') -Raw | ConvertFrom-Json
+$rF = @($tF.rounds)[0]
+Assert-True ($rF.outcome -eq 'failure') "failure round outcome is failure"
+Assert-True (@($rF.failing_tests)[0].name -eq 'adds two numbers') "failure round records the failing test name"
+Assert-True (@($rF.failing_tests)[0].message -eq 'expected 3 got 5') "failure round records the failing test message"
+Assert-True ($rF.query -eq 'make it pass') "failure round records the user query"
+$rNames = $rF.PSObject.Properties.Name
+Assert-True ($rNames -notcontains 'dialogue' -and $rNames -notcontains 'transcript') "failure round does not store full dialogue"
+
+# 14b. task_status closes the trace and removes task.json
+$cc = New-TempProject
+New-TraceState -Cwd $cc `
+    -Task @{ task_id='d1'; slug='d1'; goal='G'; started_at='2026-06-12T10:00:00+08:00' } `
+    -Prompt @{ ts='2026-06-12T10:09:00+08:00'; query='ship it' } `
+    -Outcome @{ outcome='success'; test_command='npm test'; task_status='completed' }
+Invoke-HookJson $stopF @{ cwd=$cc; session_id='sc' } | Out-Null
+$tC = Get-Content (Join-Path $cc 'superharness\trace\d1.json') -Raw | ConvertFrom-Json
+Assert-True ($tC.status -eq 'completed') "task_status promotes trace status to completed"
+Assert-True (-not (Test-Path (Join-Path $cc 'superharness\trace\.state\task.json'))) "task.json removed when task closes"
+
+Remove-Item $cf, $cc -Recurse -Force -ErrorAction SilentlyContinue
+
 # ---------------------------------------------------------------- cleanup + summary
 Remove-Item $proj, $proj2, $proj3, $proj4, $emptyDir -Recurse -Force -ErrorAction SilentlyContinue
 
