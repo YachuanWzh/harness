@@ -29,9 +29,19 @@
   <span class="badge" id="status">exploring</span>
   <span class="badge" id="rev">rev 0</span>
   <span class="badge bad" id="conn">连接中…</span>
+  <button id="submitBtn" disabled style="margin-left:auto; background:#3d5afe; color:#fff; border:0; padding:6px 14px; border-radius:6px; cursor:pointer; font-size:13px;">提交 (0)</button>
 </div>
 <svg id="canvas"><g id="viewport"></g></svg>
-<div id="hint">拖拽平移 · 滚轮缩放 · 双击空白复位 · 点击节点反馈选择</div>
+<div id="hint">拖拽平移 · 滚轮缩放 · 双击空白复位 · 单击反馈选择 · 双击节点编辑</div>
+<div id="editPanel" style="display:none; position:fixed; z-index:20; top:50%; left:50%; transform:translate(-50%,-50%); background:var(--panel); border:1px solid #3a3d4a; border-radius:10px; padding:16px; width:320px; box-shadow:0 8px 30px rgba(0,0,0,.5);">
+  <div style="font-size:13px; color:var(--muted); margin-bottom:6px;">编辑节点</div>
+  <input id="editLabel" type="text" placeholder="标签" style="width:100%; margin-bottom:8px; padding:6px 8px; background:var(--bg); color:var(--text); border:1px solid #3a3d4a; border-radius:6px;">
+  <textarea id="editNote" rows="4" placeholder="备注 (note)" style="width:100%; padding:6px 8px; background:var(--bg); color:var(--text); border:1px solid #3a3d4a; border-radius:6px; resize:vertical;"></textarea>
+  <div style="margin-top:10px; text-align:right;">
+    <button id="editCancel" style="background:#3a3d4a; color:var(--text); border:0; padding:6px 12px; border-radius:6px; cursor:pointer;">取消</button>
+    <button id="editSave" style="background:#2a9d8f; color:#fff; border:0; padding:6px 12px; border-radius:6px; cursor:pointer;">保存</button>
+  </div>
+</div>
 <script src="/layout.js"></script>
 <script>
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -45,6 +55,47 @@ let view = { x: 0, y: 0, k: 1 };
 let currentRev = -1;
 let lastSnap = null;
 let selectedId = null;
+const pendingEdits = {};   // id -> { label, note } saved-but-not-submitted
+let editingId = null;
+const panel = document.getElementById('editPanel');
+const submitBtn = document.getElementById('submitBtn');
+
+function refreshSubmit() {
+  const n = Object.keys(pendingEdits).length;
+  submitBtn.textContent = '提交 (' + n + ')';
+  submitBtn.disabled = n === 0;
+}
+function openEditor(n) {
+  editingId = n.id;
+  const pend = pendingEdits[n.id];
+  document.getElementById('editLabel').value = pend ? pend.label : n.label;
+  document.getElementById('editNote').value = pend ? (pend.note || '') : (n.note || '');
+  panel.style.display = 'block';
+}
+function closeEditor() { panel.style.display = 'none'; editingId = null; }
+document.getElementById('editCancel').addEventListener('click', closeEditor);
+document.getElementById('editSave').addEventListener('click', () => {
+  if (!editingId) return;
+  const label = document.getElementById('editLabel').value;
+  const note = document.getElementById('editNote').value;
+  pendingEdits[editingId] = { label, note };
+  fetch('/event', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ type: 'node:edit', id: editingId, label, note,
+      timestamp: Math.floor(Date.now() / 1000) }),
+  }).catch(() => {});
+  closeEditor();
+  refreshSubmit();
+  if (lastSnap) render(lastSnap);
+});
+submitBtn.addEventListener('click', () => {
+  fetch('/event', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ type: 'submit', timestamp: Math.floor(Date.now() / 1000) }),
+  }).catch(() => {});
+  for (const k of Object.keys(pendingEdits)) delete pendingEdits[k];
+  refreshSubmit();
+});
 
 function applyView() {
   viewport.setAttribute('transform', 'translate(' + view.x + ',' + view.y + ') scale(' + view.k + ')');
@@ -133,8 +184,10 @@ function render(snap) {
     }));
   }
   for (const n of nodes) {
+    const pend = pendingEdits[n.id];
     const g = el('g', { class: 'node ' + (n.state || 'open') });
-    const label = (n.state === 'resolved' ? '✓ ' : '') + n.label;
+    const shownLabel = pend ? pend.label : n.label;
+    const label = (n.state === 'resolved' ? '✓ ' : '') + shownLabel;
     const w = nodeWidth(label);
     const h = 32;
     const color = KIND_COLORS[n.kind] || KIND_COLORS.note;
@@ -145,6 +198,7 @@ function render(snap) {
       'stroke-width': n.state === 'chosen' ? 3 : (n.id === selectedId ? 2.5 : 1.5),
     });
     if (n.id === selectedId) rect.setAttribute('stroke-dasharray', '4 2');
+    if (pend) { rect.setAttribute('stroke', '#7be3a0'); rect.setAttribute('stroke-dasharray', '5 3'); }
     const text = el('text', { x: n.x, y: n.y + 4.5, 'text-anchor': 'middle' });
     text.textContent = label;
     g.appendChild(rect);
@@ -155,6 +209,7 @@ function render(snap) {
       g.appendChild(tip);
     }
     g.addEventListener('click', () => sendClick(n));
+    g.addEventListener('dblclick', e => { e.stopPropagation(); openEditor(n); });
     viewport.appendChild(g);
   }
 }

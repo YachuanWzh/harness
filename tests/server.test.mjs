@@ -218,3 +218,15 @@ test('POST submit goes to state/edits and survives a snapshot push', async t => 
   assert.equal(edits.length, 2);
   assert.equal(JSON.parse(edits[1]).type, 'submit');
 });
+
+test('mind map page wires node editing and submit', async t => {
+  const { info } = await startServer(t);
+  const html = await (await fetch(info.url + '/')).text();
+  assert.match(html, /id="editPanel"/);     // 编辑面板存在
+  assert.match(html, /id="editLabel"/);      // label 输入框
+  assert.match(html, /id="editNote"/);       // note 文本框
+  assert.match(html, /id="submitBtn"/);      // 全局提交按钮
+  assert.match(html, /node:edit/);           // 保存发 node:edit
+  assert.match(html, /"submit"|'submit'/);   // 提交发 submit
+  assert.match(html, /dblclick/);            // 双击触发
+});
