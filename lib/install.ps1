@@ -104,6 +104,7 @@ Write-Host "Superharness installed into: $MarketDir" -ForegroundColor Green
 Write-Host ""
 Write-Host "Next steps:"
 Write-Host "  1. Start Claude Code in this project directory (trust the workspace when asked)."
-Write-Host "  2. The plugin loads automatically as superharness@skills-dir."
-Write-Host "  3. Run a task:  /superharness:go <your task goal>"
+Write-Host "  2. The plugin loads automatically from the local marketplace at .claude/superharness."
+Write-Host "  3. Run a task:       /superharness:go <your task goal>"
+Write-Host "     or brainstorm:    /superharness:brainstorm <topic>"
 exit 0

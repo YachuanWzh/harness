@@ -1,5 +1,7 @@
 # superharness 本地运行时产物
 .superharness/
-# dogfood 安装产物（本仓库自装时生成）
+# dogfood 安装产物（本仓库自装时生成；真正的插件源在 template/）
+# settings.json 引用上面的 marketplace 目录，二者须一起留在本地，不提交
 .claude/superharness/
+.claude/settings.json
 .claude/settings.local.json
