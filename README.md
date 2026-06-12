@@ -70,7 +70,7 @@ superharness --template=fullstack           :: 固定 React + Python（不接受
 /superharness:go 给登录接口增加验证码校验
 ```
 
-`go` 技能驱动五阶段自主工作流：
+`go` 技能驱动六阶段自主工作流：
 
 1. **理解** —— 探索代码、确认目标，必要时一轮澄清
 2. **隔离** —— `using-git-worktrees`：git 项目默认建 worktree/分支隔离，非 git 则原地，绝不阻塞
