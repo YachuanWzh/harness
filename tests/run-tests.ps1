@@ -142,6 +142,18 @@ foreach ($s in $coreSkills) {
 Assert-True (Test-Path (Join-Path $plugin 'skills\test-driven-development\testing-anti-patterns.md')) "includes TDD supporting file testing-anti-patterns.md"
 Assert-True (Test-Path (Join-Path $plugin 'skills\requesting-code-review\code-reviewer.md')) "includes code-reviewer.md template referenced by requesting-code-review"
 
+# brainstorm skill: present, manual-only, documents the message protocol
+$bsSkillPath = Join-Path $plugin 'skills\brainstorm\SKILL.md'
+Assert-True (Test-Path $bsSkillPath) "includes brainstorm skill (/superharness:brainstorm)"
+$bs = if (Test-Path $bsSkillPath) { Get-Content $bsSkillPath -Raw } else { '' }
+Assert-True ($bs -match 'disable-model-invocation:\s*true') "brainstorm skill is manual-only (disable-model-invocation: true)"
+Assert-True ($bs -match 'mindmap:snapshot') "brainstorm skill documents the mindmap:snapshot format"
+Assert-True ($bs -match 'node:click') "brainstorm skill documents the node:click event format"
+Assert-True ($bs -match 'start-server\.ps1') "brainstorm skill references start-server.ps1"
+foreach ($f in @('server.cjs','mindmap.html','layout.js','start-server.ps1','stop-server.ps1')) {
+    Assert-True (Test-Path (Join-Path $plugin "skills\brainstorm\scripts\$f")) "includes brainstorm script: $f"
+}
+
 # no dangling superpowers: references — copied skills must be patched to superharness:
 $dangling = @(Get-ChildItem (Join-Path $plugin 'skills') -Recurse -Filter *.md -ErrorAction SilentlyContinue |
     Where-Object { (Get-Content $_.FullName -Raw) -match 'superpowers:' })
