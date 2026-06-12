@@ -261,6 +261,28 @@ if (-not $nodeCmd) {
     Remove-Item $projS -Recurse -Force -ErrorAction SilentlyContinue
 }
 
+# ---------------------------------------------------------------- Test group 8: stack guidance source docs
+Write-Host "`n[8] Template ships the six stack guidance docs"
+$stacksDir = Join-Path $RepoRoot 'template\plugins\superharness\stacks'
+$stackDocs = @{
+    'frontend-react.md' = 'React'
+    'frontend-vue.md'   = 'Vue'
+    'backend-python.md' = 'pytest'
+    'backend-java.md'   = 'JUnit'
+    'backend-node.md'   = 'Jest'
+    'fullstack.md'      = 'React'
+}
+foreach ($doc in $stackDocs.Keys) {
+    $p = Join-Path $stacksDir $doc
+    Assert-True (Test-Path $p) "template ships stacks/$doc"
+    $body = if (Test-Path $p) { Get-Content $p -Raw } else { '' }
+    Assert-True ($body -match $stackDocs[$doc]) "stacks/$doc mentions $($stackDocs[$doc])"
+    Assert-True ($body -match 'TDD|test') "stacks/$doc covers testing discipline"
+}
+$fs = Join-Path $stacksDir 'fullstack.md'
+$fsBody = if (Test-Path $fs) { Get-Content $fs -Raw } else { '' }
+Assert-True ($fsBody -match 'Python') "stacks/fullstack.md mentions Python (combined stack)"
+
 # ---------------------------------------------------------------- cleanup + summary
 Remove-Item $proj, $proj2, $proj3, $proj4, $emptyDir -Recurse -Force -ErrorAction SilentlyContinue
 
