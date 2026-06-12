@@ -65,6 +65,10 @@ function refreshSubmit() {
   submitBtn.textContent = '提交 (' + n + ')';
   submitBtn.disabled = n === 0;
 }
+function clearPending() {
+  for (const k of Object.keys(pendingEdits)) delete pendingEdits[k];
+  refreshSubmit();
+}
 function openEditor(n) {
   editingId = n.id;
   const pend = pendingEdits[n.id];
@@ -93,8 +97,10 @@ submitBtn.addEventListener('click', () => {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ type: 'submit', timestamp: Math.floor(Date.now() / 1000) }),
   }).catch(() => {});
-  for (const k of Object.keys(pendingEdits)) delete pendingEdits[k];
-  refreshSubmit();
+  // Keep the optimistic overlay until the agent's merged snapshot lands (cleared in
+  // ws.onmessage). Just lock the button so the same batch can't be re-submitted.
+  submitBtn.disabled = true;
+  submitBtn.textContent = '已提交，等待合并…';
 });
 
 function applyView() {
@@ -225,6 +231,7 @@ function connect() {
     currentRev = snap.rev;
     lastSnap = snap;
     selectedId = null;
+    clearPending();   // authoritative snapshot now reflects any merged edits
     render(snap);
   };
   ws.onclose = () => {

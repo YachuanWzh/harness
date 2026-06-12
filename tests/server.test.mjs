@@ -230,3 +230,14 @@ test('mind map page wires node editing and submit', async t => {
   assert.match(html, /"submit"|'submit'/);   // 提交发 submit
   assert.match(html, /dblclick/);            // 双击触发
 });
+
+test('optimistic edits clear on authoritative snapshot, not on submit', async t => {
+  const { info } = await startServer(t);
+  const html = await (await fetch(info.url + '/')).text();
+  // pending edits are cleared via clearPending(), wired into the WS snapshot handler
+  assert.match(html, /clearPending\(\)/);
+  // the submit handler must NOT itself wipe pendingEdits (would revert labels mid-wait)
+  const submitBlock = html.slice(html.indexOf("submitBtn.addEventListener"),
+    html.indexOf("submitBtn.addEventListener") + 400);
+  assert.doesNotMatch(submitBlock, /delete pendingEdits/);
+});

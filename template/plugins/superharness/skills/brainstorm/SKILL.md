@@ -147,16 +147,19 @@ Only `label` and `note` are editable. Same `id` later in the file wins.
 
 When you invite the user to edit node text:
 
-1. Tell them: 去浏览器双击节点改 label/note，逐个保存，改完点顶栏「提交」。
-2. Do NOT end the turn. Block-wait for a `{"type":"submit"}` line in
+1. **Establish the baseline first.** Clear `<state_dir>/edits` (truncate it) so a stale
+   submit from an earlier round can't immediately satisfy the wait. Do this BEFORE
+   inviting the user, so the window where an eager submit lands un-watched is closed.
+2. Tell them: 去浏览器双击节点改 label/note，逐个保存，改完点顶栏「提交」。
+3. Do NOT end the turn. Block-wait for a `{"type":"submit"}` line in
    `<state_dir>/edits` using `Monitor` (fall back to `ScheduleWakeup`, ≤60s, if
    `Monitor` is unavailable). This only works while you are parked in this wait.
-3. On submit: read `<state_dir>/edits`, take all `node:edit` lines (same `id` later
+4. On submit: read `<state_dir>/edits`, take all `node:edit` lines (same `id` later
    wins), apply each `label`/`note` onto the current snapshot tree by `id`; ignore
    ids no longer present.
-4. If a browser edit conflicts with what the terminal dialogue concluded for that
+5. If a browser edit conflicts with what the terminal dialogue concluded for that
    node, ask in the terminal which wins.
-5. Rewrite `<content_dir>/mindmap.json` (`rev` + 1), then clear `<state_dir>/edits`.
+6. Rewrite `<content_dir>/mindmap.json` (`rev` + 1), then clear `<state_dir>/edits`.
 
 ## Red Flags
 
