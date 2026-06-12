@@ -40,6 +40,23 @@ function Invoke-Installer {
 function Get-MarketDir { param([string]$ProjectDir) Join-Path $ProjectDir '.claude\superharness' }
 function Get-PluginDir { param([string]$ProjectDir) Join-Path $ProjectDir '.claude\superharness\plugins\superharness' }
 
+function New-TraceState {
+    param([string]$Cwd, $Task, $Prompt, $Outcome)
+    $sd = Join-Path $Cwd 'superharness\trace\.state'
+    New-Item -ItemType Directory -Force $sd | Out-Null
+    $u = New-Object System.Text.UTF8Encoding($false)
+    if ($Task)    { [IO.File]::WriteAllText((Join-Path $sd 'task.json'),           (ConvertTo-Json -InputObject $Task    -Depth 12 -Compress), $u) }
+    if ($Prompt)  { [IO.File]::WriteAllText((Join-Path $sd 'pending-prompt.json'), (ConvertTo-Json -InputObject $Prompt  -Depth 12 -Compress), $u) }
+    if ($Outcome) { [IO.File]::WriteAllText((Join-Path $sd 'outcome.json'),        (ConvertTo-Json -InputObject $Outcome -Depth 12 -Compress), $u) }
+}
+
+function Invoke-HookJson {
+    param([string]$ScriptPath, $InputObj)
+    $json = ConvertTo-Json -InputObject $InputObj -Depth 12 -Compress
+    $json | & powershell -NoProfile -ExecutionPolicy Bypass -File $ScriptPath | Out-Null
+    return $LASTEXITCODE
+}
+
 Write-Host "`n=== Superharness test suite ===" -ForegroundColor Cyan
 
 # ---------------------------------------------------------------- Test group 1: installer output
@@ -375,6 +392,26 @@ try { $ctxH2 = ($outH2 | ConvertFrom-Json).hookSpecificOutput.additionalContext 
 Assert-True ($ctxH2 -notmatch 'Frontend stack:') "hook omits stack guidance when no STACK.md"
 
 Remove-Item $ph, $ph2 -Recurse -Force -ErrorAction SilentlyContinue
+
+# ---------------------------------------------------------------- Test group 11a: trace hook install (UserPromptSubmit)
+Write-Host "`n[11a] Installer registers UserPromptSubmit + ships trace-lib and the prompt hook"
+$hk = Get-Content (Join-Path $plugin 'hooks\hooks.json') -Raw | ConvertFrom-Json
+Assert-True ($null -ne $hk.hooks.UserPromptSubmit) "hooks.json registers a UserPromptSubmit hook"
+Assert-True ($null -ne $hk.hooks.SessionStart) "hooks.json still registers SessionStart"
+Assert-True (Test-Path (Join-Path $plugin 'hooks\trace-lib.ps1')) "ships hooks/trace-lib.ps1"
+Assert-True (Test-Path (Join-Path $plugin 'hooks\user-prompt-submit.ps1')) "ships hooks/user-prompt-submit.ps1"
+
+# ---------------------------------------------------------------- Test group 12: UserPromptSubmit behavior
+Write-Host "`n[12] user-prompt-submit.ps1 stashes the pending round"
+$cwd12 = New-TempProject
+$ex12 = Invoke-HookJson (Join-Path $plugin 'hooks\user-prompt-submit.ps1') @{ cwd = $cwd12; session_id = 's1'; prompt = 'hello world' }
+Assert-True ($ex12 -eq 0) "user-prompt-submit exits 0"
+$pf12 = Join-Path $cwd12 'superharness\trace\.state\pending-prompt.json'
+Assert-True (Test-Path $pf12) "writes .state/pending-prompt.json"
+$pj12 = $null; try { $pj12 = Get-Content $pf12 -Raw | ConvertFrom-Json } catch {}
+Assert-True ($null -ne $pj12 -and $pj12.query -eq 'hello world') "pending-prompt captures the user query"
+Assert-True ($null -ne $pj12 -and $pj12.ts -match '^\d{4}-\d{2}-\d{2}T') "pending-prompt captures an ISO timestamp"
+Remove-Item $cwd12 -Recurse -Force -ErrorAction SilentlyContinue
 
 # ---------------------------------------------------------------- cleanup + summary
 Remove-Item $proj, $proj2, $proj3, $proj4, $emptyDir -Recurse -Force -ErrorAction SilentlyContinue
