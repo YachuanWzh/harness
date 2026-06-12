@@ -197,6 +197,37 @@ Assert-True ($emptyExit -eq 0) "hook exits 0 even when HARNESS.md is missing"
 Write-Host "`n[6] CLI entry point"
 Assert-True (Test-Path (Join-Path $RepoRoot 'bin\superharness.cmd')) "bin/superharness.cmd exists (PATH-callable from cmd and PowerShell)"
 
+# ---------------------------------------------------------------- Test group 7: brainstorm server scripts
+Write-Host "`n[7] Brainstorm start/stop server scripts"
+$nodeCmd = Get-Command node -ErrorAction SilentlyContinue
+if (-not $nodeCmd) {
+    Write-Host "  SKIP  node not on PATH - skipping server script tests" -ForegroundColor Yellow
+} else {
+    $scriptsDir = Join-Path $RepoRoot 'template\plugins\superharness\skills\brainstorm\scripts'
+    $projS = New-TempProject
+    $startOut = & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $scriptsDir 'start-server.ps1') -ProjectDir $projS
+    Assert-True ($LASTEXITCODE -eq 0) "start-server.ps1 exits 0"
+    $infoOk = $false; $info = $null
+    try { $info = ($startOut -join "`n") | ConvertFrom-Json; $infoOk = $true } catch {}
+    Assert-True $infoOk "start-server.ps1 prints server-info JSON"
+    Assert-True ($info.url -match '^http://localhost:\d+$') "server-info has a localhost URL"
+    $sessionDir = Split-Path -Parent $info.state_dir
+    Assert-True ($sessionDir -like (Join-Path $projS '.superharness\brainstorm\*')) "session dir lives under .superharness/brainstorm/"
+
+    $httpOk = $false
+    try { $resp = Invoke-WebRequest -Uri $info.url -UseBasicParsing -TimeoutSec 5; $httpOk = ($resp.StatusCode -eq 200) } catch {}
+    Assert-True $httpOk "served URL responds with HTTP 200"
+
+    & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $scriptsDir 'stop-server.ps1') -SessionDir $sessionDir | Out-Null
+    Assert-True ($LASTEXITCODE -eq 0) "stop-server.ps1 exits 0"
+    Start-Sleep -Milliseconds 500
+    $procGone = $null -eq (Get-Process -Id $info.pid -ErrorAction SilentlyContinue)
+    Assert-True $procGone "server process is stopped"
+    Assert-True (Test-Path (Join-Path $sessionDir 'state\server-stopped')) "server-stopped marker exists"
+    Assert-True (-not (Test-Path (Join-Path $sessionDir 'state\server-info'))) "server-info removed after stop"
+    Remove-Item $projS -Recurse -Force -ErrorAction SilentlyContinue
+}
+
 # ---------------------------------------------------------------- cleanup + summary
 Remove-Item $proj, $proj2, $proj3, $emptyDir -Recurse -Force -ErrorAction SilentlyContinue
 
