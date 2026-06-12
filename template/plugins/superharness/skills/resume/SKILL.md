@@ -25,6 +25,11 @@ resume never auto-retries.
 
 ## Phase 1 — Reproduce (RED)
 
+**Keep the trace active.** If `superharness/trace/.state/task.json` is missing (the task
+was already closed), re-create it (single-line JSON) with the original `task_id` / `slug`
+/ `goal` taken from the trace before changing anything — otherwise the Stop hook is a
+no-op and your reproduce/fix attempts are not recorded as new rounds.
+
 Re-run the recorded `test_command` (or the specific `failing_tests`). Confirm they
 still fail for the recorded reason. If they now pass, report that the failure no
 longer reproduces and ask whether to continue the original goal instead.

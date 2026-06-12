@@ -39,6 +39,9 @@ partner (destructive actions, ambiguous product choices). Everything else, decid
 - **Trace bootstrap.** At task start, write `superharness/trace/.state/task.json`
   (single-line JSON) with `{"task_id":"<YYYY-MM-DD-slug>","slug":"<YYYY-MM-DD-slug>","goal":"<one-line goal>","started_at":"<ISO8601>"}`.
   This activates per-round tracking — the Stop hook is a no-op until it exists.
+  Track **one active go task per project** at a time: this file is the single
+  active-task marker, so do not run concurrent `go` tasks in the same project
+  (a new task overwrites it and rounds would be appended to the wrong trace).
 
 ## Phase 2 — Implement (TDD, no exceptions)
 

@@ -8,7 +8,7 @@ try {
     if (-not $in) { exit 0 }
     $cwd = $in.cwd
     if ([string]::IsNullOrWhiteSpace($cwd)) { exit 0 }
-    $pending = @{ ts = (Now-Iso); query = [string]$in.prompt }
+    $pending = @{ ts = (Get-IsoTimestamp); query = [string]$in.prompt }
     Write-MinifiedJson (Join-Path (Get-StateDir $cwd) 'pending-prompt.json') $pending
 } catch { }
 exit 0

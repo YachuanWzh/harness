@@ -532,6 +532,14 @@ Assert-True ($resumeMd -match 'systematic-debugging') "resume skill invokes syst
 Assert-True ($resumeMd -match 'verification-before-completion') "resume skill verifies before claiming done"
 Assert-True ($resumeMd -notmatch 'superpowers:') "resume skill uses the superharness namespace"
 
+# ---------------------------------------------------------------- Test group 17: review fixes (concurrency note + resume re-bootstrap)
+Write-Host "`n[17] docs cover single-active-task limit and resume re-bootstraps task.json"
+$goMd2 = Get-Content (Join-Path $plugin 'skills\go\SKILL.md') -Raw
+Assert-True ($goMd2 -match '(?i)one active') "go skill documents one active go task per project"
+$resumeMd2 = Get-Content (Join-Path $plugin 'skills\resume\SKILL.md') -Raw
+Assert-True ($resumeMd2 -match 'task\.json') "resume skill references the task.json marker"
+Assert-True ($resumeMd2 -match '(?i)re-create|re-bootstrap|recreate') "resume skill re-bootstraps task.json so attempts are recorded"
+
 # ---------------------------------------------------------------- cleanup + summary
 Remove-Item $proj, $proj2, $proj3, $proj4, $emptyDir -Recurse -Force -ErrorAction SilentlyContinue
 

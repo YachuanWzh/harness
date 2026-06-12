@@ -105,6 +105,10 @@ superharness --template=fullstack           :: 固定 React + Python（不接受
 **复现 → 定位根因（systematic-debugging）→ 改码（TDD）→ 验证**闭环，把出问题的代码真正修好，
 而非盲目重跑；每次尝试都累积进 trace。临时标记位于 `superharness/trace/.state/`（已加入 `.gitignore`）。
 
+> 约束：每个项目同一时间只跟踪 **一个活跃 go 任务**（`.state/task.json` 是单一活跃标记）。
+> 不要在同一项目里并发跑多个 `go` 任务，否则轮次会被记到错误的 trace。`resume` 恢复一个已关闭的
+> 任务时会按原 slug 重建 `task.json`，让本次修复尝试继续被记录。
+
 ### 5. 脑图脑暴（手动触发）
 
 ```
@@ -170,7 +174,7 @@ superharness\
 本项目自身按 TDD 构建，两套测试：
 
 ```cmd
-:: 安装器 + 钩子（PowerShell，零依赖，158 个断言）
+:: 安装器 + 钩子（PowerShell，零依赖）
 powershell -NoProfile -ExecutionPolicy Bypass -File tests\run-tests.ps1
 
 :: 脑图服务器 + 布局纯函数（需 Node ≥ 18，17 个用例）

@@ -13,7 +13,7 @@ function Read-HookInput {
 
 function Get-TraceDir { param([string]$Cwd) Join-Path $Cwd 'superharness\trace' }
 function Get-StateDir { param([string]$Cwd) Join-Path (Get-TraceDir $Cwd) '.state' }
-function Now-Iso { (Get-Date).ToString('yyyy-MM-ddTHH:mm:sszzz') }
+function Get-IsoTimestamp { (Get-Date).ToString('yyyy-MM-ddTHH:mm:sszzz') }
 
 function Read-JsonFile {
     param([string]$Path)

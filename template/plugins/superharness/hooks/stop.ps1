@@ -22,7 +22,7 @@ try {
     }
 
     $prompt = Read-JsonFile $promptFile
-    $ts    = if ($prompt -and $prompt.ts) { $prompt.ts } else { Now-Iso }
+    $ts    = if ($prompt -and $prompt.ts) { $prompt.ts } else { Get-IsoTimestamp }
     $query = if ($prompt) { $prompt.query } else { $null }
 
     $od = Read-JsonFile $outcomeFile
@@ -40,7 +40,7 @@ try {
     } elseif ($outcome -eq 'failure') {
         $round = [ordered]@{ n=$n; ts=$ts; query=$query; outcome='failure' }
         if ($od.test_command)  { $round.test_command  = [string]$od.test_command }
-        if ($od.failing_tests) { $round.failing_tests = $od.failing_tests }
+        if ($od.failing_tests) { $round.failing_tests = @($od.failing_tests) }
         if ($od.notes)         { $round.notes         = [string]$od.notes }
     } else {
         $round = [ordered]@{ n=$n; ts=$ts; query=$query; outcome='in_progress' }
@@ -54,7 +54,7 @@ try {
         task_id    = $task.task_id
         goal       = $task.goal
         started_at = $started
-        updated_at = (Now-Iso)
+        updated_at = (Get-IsoTimestamp)
         status     = $status
         rounds     = $rounds
     }
