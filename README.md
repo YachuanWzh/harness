@@ -73,10 +73,11 @@ superharness --template=fullstack           :: 固定 React + Python（不接受
 `go` 技能驱动五阶段自主工作流：
 
 1. **理解** —— 探索代码、确认目标，必要时一轮澄清
-2. **计划** —— `writing-plans`：拆成 2-5 分钟的 TDD 小任务，存到 `superharness/plans/`
-3. **实现** —— `test-driven-development`：每个任务严格红-绿-重构-提交；出问题转 `systematic-debugging`
-4. **验证** —— `verification-before-completion`：跑完整测试套件，贴出真实输出
-5. **审查** —— `requesting-code-review`：派子代理审查 diff，严重问题阻塞收尾
+2. **隔离** —— `using-git-worktrees`：git 项目默认建 worktree/分支隔离，非 git 则原地，绝不阻塞
+3. **计划** —— `writing-plans`：拆成 2-5 分钟的 TDD 小任务，存到 `superharness/plans/`
+4. **实现** —— 多任务计划委托 `subagent-driven-development`（每任务派新子代理，主上下文只留计划与协调），琐碎/紧耦合任务主代理内联 `test-driven-development`；均严格红-绿-重构-提交，出问题转 `systematic-debugging`
+5. **验证** —— `verification-before-completion`：跑完整测试套件，贴出真实输出
+6. **审查** —— `requesting-code-review`：派子代理审查 diff，严重问题阻塞收尾
 
 ### 4. 任务过程跟踪与恢复（resume）
 
@@ -140,6 +141,8 @@ superharness --template=fullstack           :: 固定 React + Python（不接受
 | `superharness:resume` | 本项目 | **仅手动** `/superharness:resume`，从 trace 复现并修复失败的任务 |
 | `superharness:brainstorm` | 本项目（流程参考 superpowers） | **仅手动** `/superharness:brainstorm`，实时脑图梳理需求设计 |
 | `superharness:writing-plans` | superpowers（适配） | 多步任务动代码之前 |
+| `superharness:using-git-worktrees` | superpowers（适配） | 动代码前需要隔离工作区（go Phase 0.5） |
+| `superharness:subagent-driven-development` | superpowers（适配） | 执行多任务计划、任务相互独立时（go Phase 2） |
 | `superharness:test-driven-development` | superpowers | 实现任何功能/修复之前 |
 | `superharness:systematic-debugging` | superpowers | 任何 bug、测试失败、异常行为 |
 | `superharness:verification-before-completion` | superpowers | 声称"完成/修好/通过"之前 |
@@ -161,7 +164,7 @@ superharness\
 │       ├── hooks\trace-lib.ps1           # 追踪钩子共享辅助（最小化 JSON 读写）
 │       ├── hooks\user-prompt-submit.ps1  # 捕获每轮 query 的钩子
 │       ├── hooks\stop.ps1                # 合成并落盘每轮记录的钩子
-│       └── skills\...                    # go + resume + brainstorm + 5 个核心技能
+│       └── skills\...                    # go + resume + brainstorm + using-git-worktrees + subagent-driven-development + 5 个核心技能
 │           └── brainstorm\scripts\       # server.cjs / mindmap.html / layout.js / start|stop-server.ps1
 ├── tests\run-tests.ps1      # 安装器/钩子测试套件（PowerShell，TDD）
 ├── tests\*.test.mjs         # 脑图服务器与布局测试（node --test）
