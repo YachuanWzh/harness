@@ -172,3 +172,21 @@ test('mind map page contains pan/zoom and click feedback wiring', async t => {
   assert.match(html, /node:click/);     // feedback event
   assert.match(html, /WebSocket/);      // live updates
 });
+
+test('POST node:edit appends to state/edits, not state/events', async t => {
+  const { info, session } = await startServer(t);
+  const evt = { type: 'node:edit', id: 'q1-a', label: '新标签', note: '新备注', timestamp: 1760000001 };
+  const res = await fetch(info.url + '/event', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(evt),
+  });
+  assert.equal(res.status, 204);
+  const editsPath = path.join(session, 'state', 'edits');
+  const lines = fs.readFileSync(editsPath, 'utf-8').trim().split('\n');
+  assert.equal(lines.length, 1);
+  assert.deepEqual(JSON.parse(lines[0]), evt);
+  // must NOT have leaked into events
+  assert.ok(!fs.existsSync(path.join(session, 'state', 'events'))
+    || fs.readFileSync(path.join(session, 'state', 'events'), 'utf-8') === '');
+});

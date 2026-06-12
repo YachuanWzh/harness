@@ -16,6 +16,7 @@ const CONTENT_DIR = path.join(SESSION_DIR, 'content');
 const STATE_DIR = path.join(SESSION_DIR, 'state');
 const SNAPSHOT_FILE = path.join(CONTENT_DIR, 'mindmap.json');
 const EVENTS_FILE = path.join(STATE_DIR, 'events');
+const EDITS_FILE = path.join(STATE_DIR, 'edits');
 const INFO_FILE = path.join(STATE_DIR, 'server-info');
 const STOPPED_FILE = path.join(STATE_DIR, 'server-stopped');
 const PORT = Number(process.env.SUPERHARNESS_PORT) || (49152 + Math.floor(Math.random() * 16383));
@@ -120,8 +121,9 @@ const server = http.createServer((req, res) => {
     req.on('data', chunk => { body += chunk; });
     req.on('end', () => {
       try {
-        JSON.parse(body);
-        fs.appendFileSync(EVENTS_FILE, body.trim() + '\n');
+        const msg = JSON.parse(body);
+        const file = (msg.type === 'node:edit' || msg.type === 'submit') ? EDITS_FILE : EVENTS_FILE;
+        fs.appendFileSync(file, body.trim() + '\n');
         res.writeHead(204);
         res.end();
       } catch {
