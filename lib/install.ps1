@@ -56,7 +56,11 @@ Set-Member $settings.enabledPlugins 'superharness@superharness' $true
 
 [IO.File]::WriteAllText($SettingsPath, ($settings | ConvertTo-Json -Depth 16), $utf8)
 
-# --- 3. Managed section in CLAUDE.md (auto-read fallback + user docs) ---
+# --- 3. Remove legacy skills-dir install ---
+$LegacyDir = Join-Path $TargetDir '.claude\skills\superharness'
+if (Test-Path $LegacyDir) { Remove-Item $LegacyDir -Recurse -Force }
+
+# --- 4. Managed section in CLAUDE.md (auto-read fallback + user docs) ---
 $BeginMarker = '<!-- SUPERHARNESS:BEGIN -->'
 $EndMarker   = '<!-- SUPERHARNESS:END -->'
 
@@ -64,12 +68,16 @@ $Section = @"
 $BeginMarker
 ## Superharness
 
-This project uses **superharness** (loaded from ``.claude/skills/superharness/`` as the
-``superharness@skills-dir`` plugin). Its SessionStart hook injects ``HARNESS.md`` into every
-session. If that context is missing, read ``.claude/skills/superharness/HARNESS.md`` now
-and follow it for all engineering work.
+This project uses **superharness**, loaded as a Claude Code plugin from the local
+marketplace at ``.claude/superharness`` (enabled in ``.claude/settings.json`` via
+``extraKnownMarketplaces`` + ``enabledPlugins``). Its SessionStart hook injects
+``HARNESS.md`` into every session. If that context is missing, read
+``.claude/superharness/plugins/superharness/HARNESS.md`` now and follow it for all
+engineering work.
 
 - Run a task end-to-end: ``/superharness:go <task goal>``
+- Brainstorm with a live browser mind map (manual trigger only):
+  ``/superharness:brainstorm <topic>``
 - Non-negotiable: strict TDD (failing test first), systematic debugging, and
   verification with real command output before claiming anything is done.
 $EndMarker

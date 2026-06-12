@@ -107,6 +107,27 @@ Invoke-Installer -TargetDir $proj3 | Out-Null
 $st3b = Get-Content (Join-Path $proj3 '.claude\settings.json') -Raw | ConvertFrom-Json
 Assert-True ($st3b.enabledPlugins.'superharness@superharness' -eq $true) "second install keeps settings valid and enabled"
 
+# ---------------------------------------------------------------- Test group 1.7: legacy cleanup + docs
+Write-Host "`n[1.7] Installer cleans legacy install and updates docs"
+$proj4 = New-TempProject
+$legacy = Join-Path $proj4 '.claude\skills\superharness'
+New-Item -ItemType Directory -Force $legacy | Out-Null
+Set-Content -Path (Join-Path $legacy 'dummy.txt') -Value 'old' -Encoding utf8
+Invoke-Installer -TargetDir $proj4 | Out-Null
+Assert-True (-not (Test-Path $legacy)) "removes legacy .claude/skills/superharness directory"
+
+$cm4 = Get-Content (Join-Path $proj4 'CLAUDE.md') -Raw
+Assert-True ($cm4 -match '\.claude/superharness') "CLAUDE.md section points to .claude/superharness"
+Assert-True ($cm4 -notmatch 'skills-dir') "CLAUDE.md section no longer mentions skills-dir"
+Assert-True ($cm4 -match 'superharness:brainstorm') "CLAUDE.md mentions /superharness:brainstorm"
+
+$harnessDoc = Get-Content (Join-Path (Get-PluginDir $proj4) 'HARNESS.md') -Raw
+Assert-True ($harnessDoc -notmatch 'skills-dir') "HARNESS.md no longer mentions skills-dir loading"
+Assert-True ($harnessDoc -match 'superharness:brainstorm') "HARNESS.md lists the brainstorm skill"
+
+$pj = Get-Content (Join-Path (Get-PluginDir $proj4) '.claude-plugin\plugin.json') -Raw | ConvertFrom-Json
+Assert-True ($pj.version -eq '2.0.0') "plugin.json version bumped to 2.0.0"
+
 # ---------------------------------------------------------------- Test group 2: skills
 Write-Host "`n[2] Installer copies the go skill and the core engineering skills"
 Assert-True (Test-Path (Join-Path $plugin 'skills\go\SKILL.md')) "creates skills/go/SKILL.md (/superharness:go entry point)"
@@ -229,7 +250,7 @@ if (-not $nodeCmd) {
 }
 
 # ---------------------------------------------------------------- cleanup + summary
-Remove-Item $proj, $proj2, $proj3, $emptyDir -Recurse -Force -ErrorAction SilentlyContinue
+Remove-Item $proj, $proj2, $proj3, $proj4, $emptyDir -Recurse -Force -ErrorAction SilentlyContinue
 
 Write-Host "`n=== Results: $script:Passed passed, $script:Failed failed ===" -ForegroundColor Cyan
 if ($script:Failed -gt 0) {

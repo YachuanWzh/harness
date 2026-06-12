@@ -1,7 +1,7 @@
 # Superharness Bootstrap
 
 You have superharness: a project-level engineering discipline harness. It is loaded
-as the `superharness@skills-dir` plugin from `.claude/skills/superharness/` and this
+as a Claude Code plugin from the local marketplace at `.claude/superharness` and this
 document is injected at session start by its SessionStart hook.
 
 ## The Rule
@@ -15,6 +15,7 @@ the Skill tool before doing anything else.**
 | Skill | Invoke when |
 |-------|-------------|
 | `superharness:go` | The user gives a task goal to complete end-to-end (also triggered by `/superharness:go <goal>`) |
+| `superharness:brainstorm` | ONLY when the user explicitly runs `/superharness:brainstorm <topic>` — never self-invoke. Requirements/design dialogue with a live browser mind map |
 | `superharness:writing-plans` | A multi-step task needs an implementation plan, before touching code |
 | `superharness:test-driven-development` | Implementing ANY feature or bugfix, before writing implementation code |
 | `superharness:systematic-debugging` | Any bug, test failure, or unexpected behavior, before proposing fixes |
