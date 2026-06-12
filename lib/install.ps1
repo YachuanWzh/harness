@@ -6,7 +6,9 @@
 # Usage: powershell -File install.ps1 [-TargetDir <project root>]
 
 param(
-    [string]$TargetDir = (Get-Location).Path
+    [string]$TargetDir = (Get-Location).Path,
+    [Parameter(ValueFromRemainingArguments = $true)]
+    [string[]]$Rest
 )
 
 $ErrorActionPreference = 'Stop'
@@ -23,11 +25,53 @@ if (-not (Test-Path $TargetDir)) {
     exit 1
 }
 
+# --- Parse optional --template / --stack from forwarded CLI args ---
+$Template = $null; $Stack = $null
+foreach ($a in $Rest) {
+    if ($a -match '^--template=(.+)$') { $Template = $Matches[1].ToLower() }
+    elseif ($a -match '^--stack=(.+)$') { $Stack = $Matches[1].ToLower() }
+}
+
+# resolved stack-doc id, or $null when no --template given
+$StackDocId = $null
+if ($Template) {
+    $valid = @{
+        frontend  = @{ default = 'react';  stacks = @('react','vue') }
+        backend   = @{ default = 'python'; stacks = @('python','java','node') }
+        fullstack = @{ default = $null;    stacks = @() }
+    }
+    if (-not $valid.ContainsKey($Template)) {
+        Write-Error "Unknown --template '$Template'. Valid: frontend, backend, fullstack."
+        exit 1
+    }
+    if ($Template -eq 'fullstack') {
+        if ($Stack) { Write-Error "--stack is not allowed with --template=fullstack (fixed React+Python)."; exit 1 }
+        $StackDocId = 'fullstack'
+    } else {
+        if (-not $Stack) { $Stack = $valid[$Template].default }
+        if ($valid[$Template].stacks -notcontains $Stack) {
+            Write-Error "Invalid --stack '$Stack' for --template=$Template. Valid: $($valid[$Template].stacks -join ', ')."
+            exit 1
+        }
+        $StackDocId = "$Template-$Stack"
+    }
+}
+
 $MarketDir = Join-Path $TargetDir '.claude\superharness'
 
 # --- 1. Copy template -> .claude/superharness (local marketplace root, idempotent overwrite) ---
 New-Item -ItemType Directory -Force $MarketDir | Out-Null
 Copy-Item -Path (Join-Path $TemplateDir '*') -Destination $MarketDir -Recurse -Force
+
+# --- 1b. Active stack guidance: write chosen STACK.md, or remove it for a plain install ---
+$StackTarget = Join-Path $MarketDir 'STACK.md'
+if ($StackDocId) {
+    $StackSource = Join-Path $MarketDir "plugins\superharness\stacks\$StackDocId.md"
+    if (-not (Test-Path $StackSource)) { Write-Error "Stack guidance doc missing: $StackSource"; exit 1 }
+    Copy-Item -Path $StackSource -Destination $StackTarget -Force
+} elseif (Test-Path $StackTarget) {
+    Remove-Item $StackTarget -Force
+}
 
 # --- 2. Merge .claude/settings.json (preserving existing keys) ---
 $utf8 = New-Object System.Text.UTF8Encoding($false)

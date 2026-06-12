@@ -29,8 +29,11 @@ function New-TempProject {
 }
 
 function Invoke-Installer {
-    param([string]$TargetDir)
-    & powershell -NoProfile -ExecutionPolicy Bypass -File $InstallScript -TargetDir $TargetDir | Out-Null
+    param([string]$TargetDir, [string]$Template, [string]$Stack)
+    $extra = @()
+    if ($Template) { $extra += "--template=$Template" }
+    if ($Stack)    { $extra += "--stack=$Stack" }
+    & powershell -NoProfile -ExecutionPolicy Bypass -File $InstallScript -TargetDir $TargetDir @extra | Out-Null
     return $LASTEXITCODE
 }
 
@@ -282,6 +285,60 @@ foreach ($doc in $stackDocs.Keys) {
 $fs = Join-Path $stacksDir 'fullstack.md'
 $fsBody = if (Test-Path $fs) { Get-Content $fs -Raw } else { '' }
 Assert-True ($fsBody -match 'Python') "stacks/fullstack.md mentions Python (combined stack)"
+
+# ---------------------------------------------------------------- Test group 9: --template validation + resolution
+Write-Host "`n[9] Installer resolves --template/--stack into STACK.md"
+function Get-StackFile { param([string]$ProjectDir) Join-Path $ProjectDir '.claude\superharness\STACK.md' }
+
+# 9a. frontend default -> React
+$pf = New-TempProject
+Invoke-Installer -TargetDir $pf -Template 'frontend' | Out-Null
+$sf = Get-StackFile $pf
+Assert-True (Test-Path $sf) "frontend default writes STACK.md"
+$sfBody = if (Test-Path $sf) { Get-Content $sf -Raw } else { '' }
+Assert-True ($sfBody -match 'React') "frontend default STACK.md is React"
+Assert-True ($sfBody -notmatch 'This project''s frontend is \*\*Vue') "frontend default is not Vue"
+
+# 9b. frontend --stack=vue
+$pv = New-TempProject
+Invoke-Installer -TargetDir $pv -Template 'frontend' -Stack 'vue' | Out-Null
+Assert-True ((Get-Content (Get-StackFile $pv) -Raw) -match 'Vue') "frontend --stack=vue STACK.md is Vue"
+
+# 9c. backend default -> Python
+$pb = New-TempProject
+Invoke-Installer -TargetDir $pb -Template 'backend' | Out-Null
+Assert-True ((Get-Content (Get-StackFile $pb) -Raw) -match 'pytest') "backend default STACK.md is Python"
+
+# 9d. backend --stack=java / node
+$pj = New-TempProject
+Invoke-Installer -TargetDir $pj -Template 'backend' -Stack 'java' | Out-Null
+Assert-True ((Get-Content (Get-StackFile $pj) -Raw) -match 'JUnit') "backend --stack=java STACK.md is Java"
+$pn = New-TempProject
+Invoke-Installer -TargetDir $pn -Template 'backend' -Stack 'node' | Out-Null
+Assert-True ((Get-Content (Get-StackFile $pn) -Raw) -match 'Jest|Node') "backend --stack=node STACK.md is Node"
+
+# 9e. fullstack -> React + Python
+$pfs = New-TempProject
+Invoke-Installer -TargetDir $pfs -Template 'fullstack' | Out-Null
+$fsB = Get-Content (Get-StackFile $pfs) -Raw
+Assert-True ($fsB -match 'React' -and $fsB -match 'Python') "fullstack STACK.md mentions React and Python"
+Assert-True ($fsB -match 'seam|API contract') "fullstack STACK.md covers the integration seam"
+
+# 9f. errors -> non-zero exit
+Assert-True ((Invoke-Installer -TargetDir (New-TempProject) -Template 'bogus') -ne 0) "invalid --template exits non-zero"
+Assert-True ((Invoke-Installer -TargetDir (New-TempProject) -Template 'frontend' -Stack 'python') -ne 0) "invalid stack for template exits non-zero"
+Assert-True ((Invoke-Installer -TargetDir (New-TempProject) -Template 'fullstack' -Stack 'react') -ne 0) "fullstack + --stack exits non-zero"
+
+# 9g. backward compat: no --template -> no STACK.md
+$pnone = New-TempProject
+Invoke-Installer -TargetDir $pnone | Out-Null
+Assert-True (-not (Test-Path (Get-StackFile $pnone))) "no --template leaves no STACK.md"
+
+# 9h. plain re-install after a template removes STACK.md
+Invoke-Installer -TargetDir $pf | Out-Null
+Assert-True (-not (Test-Path (Get-StackFile $pf))) "plain re-install removes a previously written STACK.md"
+
+Remove-Item $pf, $pv, $pb, $pj, $pn, $pfs, $pnone -Recurse -Force -ErrorAction SilentlyContinue
 
 # ---------------------------------------------------------------- cleanup + summary
 Remove-Item $proj, $proj2, $proj3, $proj4, $emptyDir -Recurse -Force -ErrorAction SilentlyContinue
