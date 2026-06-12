@@ -17,6 +17,8 @@ the Skill tool before doing anything else.**
 | `superharness:go` | The user gives a task goal to complete end-to-end (also triggered by `/superharness:go <goal>`) |
 | `superharness:brainstorm` | ONLY when the user explicitly runs `/superharness:brainstorm <topic>` — never self-invoke. Requirements/design dialogue with a live browser mind map |
 | `superharness:writing-plans` | A multi-step task needs an implementation plan, before touching code |
+| `superharness:using-git-worktrees` | Starting feature work that needs an isolated workspace, before implementation (go Phase 0.5) |
+| `superharness:subagent-driven-development` | Executing a multi-task plan with independent tasks in the current session (go Phase 2) |
 | `superharness:test-driven-development` | Implementing ANY feature or bugfix, before writing implementation code |
 | `superharness:systematic-debugging` | Any bug, test failure, or unexpected behavior, before proposing fixes |
 | `superharness:requesting-code-review` | A task or major feature is complete, before moving on or merging |
