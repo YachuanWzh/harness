@@ -413,6 +413,71 @@ Assert-True ($null -ne $pj12 -and $pj12.query -eq 'hello world') "pending-prompt
 Assert-True ($null -ne $pj12 -and $pj12.ts -match '^\d{4}-\d{2}-\d{2}T') "pending-prompt captures an ISO timestamp"
 Remove-Item $cwd12 -Recurse -Force -ErrorAction SilentlyContinue
 
+# ---------------------------------------------------------------- Test group 11b: Stop hook install
+Write-Host "`n[11b] Installer registers Stop + ships stop.ps1"
+$hk2 = Get-Content (Join-Path $plugin 'hooks\hooks.json') -Raw | ConvertFrom-Json
+Assert-True ($null -ne $hk2.hooks.Stop) "hooks.json registers a Stop hook"
+Assert-True (Test-Path (Join-Path $plugin 'hooks\stop.ps1')) "ships hooks/stop.ps1"
+
+# ---------------------------------------------------------------- Test group 13: Stop hook core behavior
+Write-Host "`n[13] stop.ps1 composes and persists a round"
+$stop = Join-Path $plugin 'hooks\stop.ps1'
+
+# 13a. success round -> "task completed"
+$c1 = New-TempProject
+New-TraceState -Cwd $c1 `
+    -Task @{ task_id='2026-06-12-x'; slug='2026-06-12-x'; goal='G'; started_at='2026-06-12T10:00:00+08:00' } `
+    -Prompt @{ ts='2026-06-12T10:01:00+08:00'; query='do the thing' } `
+    -Outcome @{ outcome='success'; test_command='npm test' }
+$e1 = Invoke-HookJson $stop @{ cwd=$c1; session_id='s1' }
+$tf1 = Join-Path $c1 'superharness\trace\2026-06-12-x.json'
+Assert-True ($e1 -eq 0) "stop exits 0 on a success round"
+Assert-True (Test-Path $tf1) "stop writes the per-task trace file"
+$raw1 = if (Test-Path $tf1) { Get-Content $tf1 -Raw } else { '' }
+Assert-True ($raw1 -notmatch "`n") "trace file is a single minified line"
+$t1 = $null; try { $t1 = $raw1 | ConvertFrom-Json } catch {}
+Assert-True ($null -ne $t1 -and @($t1.rounds).Count -eq 1) "trace has one round"
+Assert-True ($null -ne $t1 -and @($t1.rounds)[0].outcome -eq 'success') "success round outcome is success"
+Assert-True ($null -ne $t1 -and @($t1.rounds)[0].summary -eq 'task completed') "success round records 'task completed'"
+Assert-True ($null -ne $t1 -and @($t1.rounds)[0].query -eq 'do the thing') "round carries the user query"
+Assert-True (-not (Test-Path (Join-Path $c1 'superharness\trace\.state\pending-prompt.json'))) "pending-prompt consumed"
+Assert-True (-not (Test-Path (Join-Path $c1 'superharness\trace\.state\outcome.json'))) "outcome marker consumed"
+
+# 13b. missing outcome marker -> in_progress (requirement 1 holds without the marker)
+$c2 = New-TempProject
+New-TraceState -Cwd $c2 `
+    -Task @{ task_id='t2'; slug='t2'; goal='G2'; started_at='2026-06-12T10:00:00+08:00' } `
+    -Prompt @{ ts='2026-06-12T10:05:00+08:00'; query='clarify please' }
+Invoke-HookJson $stop @{ cwd=$c2; session_id='s2' } | Out-Null
+$t2 = Get-Content (Join-Path $c2 'superharness\trace\t2.json') -Raw | ConvertFrom-Json
+Assert-True (@($t2.rounds)[0].outcome -eq 'in_progress') "round with no marker is logged as in_progress"
+Assert-True (@($t2.rounds)[0].query -eq 'clarify please') "in_progress round still records the query"
+
+# 13c. no task.json -> no-op (no trace file, stray prompt cleaned)
+$c3 = New-TempProject
+New-TraceState -Cwd $c3 -Prompt @{ ts='2026-06-12T10:00:00+08:00'; query='stray' }
+$e3 = Invoke-HookJson $stop @{ cwd=$c3; session_id='s3' }
+Assert-True ($e3 -eq 0) "stop exits 0 when no task is active"
+Assert-True (-not (Test-Path (Join-Path $c3 'superharness\trace\.state\pending-prompt.json'))) "stray pending-prompt cleaned when no task"
+Assert-True ((Get-ChildItem (Join-Path $c3 'superharness\trace') -Filter *.json -ErrorAction SilentlyContinue).Count -eq 0) "no trace file created without a task"
+
+# 13d. malformed / empty stdin -> exit 0, no throw
+$e4a = '' | & powershell -NoProfile -ExecutionPolicy Bypass -File $stop; $e4a = $LASTEXITCODE
+$e4b = 'not json' | & powershell -NoProfile -ExecutionPolicy Bypass -File $stop; $e4b = $LASTEXITCODE
+Assert-True ($e4a -eq 0) "stop exits 0 on empty stdin"
+Assert-True ($e4b -eq 0) "stop exits 0 on malformed stdin"
+
+# 13e. second round appends with incrementing round number
+New-TraceState -Cwd $c1 `
+    -Prompt @{ ts='2026-06-12T10:10:00+08:00'; query='round two' } `
+    -Outcome @{ outcome='success'; test_command='npm test' }
+Invoke-HookJson $stop @{ cwd=$c1; session_id='s1' } | Out-Null
+$t1b = Get-Content $tf1 -Raw | ConvertFrom-Json
+Assert-True (@($t1b.rounds).Count -eq 2) "second round is appended"
+Assert-True (@($t1b.rounds)[1].n -eq 2) "second round is numbered 2"
+
+Remove-Item $c1, $c2, $c3 -Recurse -Force -ErrorAction SilentlyContinue
+
 # ---------------------------------------------------------------- cleanup + summary
 Remove-Item $proj, $proj2, $proj3, $proj4, $emptyDir -Recurse -Force -ErrorAction SilentlyContinue
 
