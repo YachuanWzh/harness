@@ -25,6 +25,16 @@ partner (destructive actions, ambiguous product choices). Everything else, decid
    clarifying questions. Otherwise proceed with the most reasonable interpretation and
    note your assumptions in the plan.
 
+## Phase 0.5 — Isolate
+
+**REQUIRED SUB-SKILL:** `superharness:using-git-worktrees`
+
+Set up an isolated workspace before changing anything. In a git project this
+creates a worktree on a new branch **by default** (no consent prompt) so a run
+that goes wrong can be discarded cleanly. If the project is not a git repo, or
+worktree creation fails, work in place — never block. Everything after this
+(plan, trace, implementation, commits) happens in whatever workspace this leaves.
+
 ## Phase 1 — Plan
 
 **REQUIRED SUB-SKILL:** `superharness:writing-plans`
@@ -45,18 +55,29 @@ partner (destructive actions, ambiguous product choices). Everything else, decid
 
 ## Phase 2 — Implement (TDD, no exceptions)
 
-**REQUIRED SUB-SKILL:** `superharness:test-driven-development`
+**REQUIRED SUB-SKILLS:** `superharness:subagent-driven-development` (for plans
+with multiple independent tasks) and `superharness:test-driven-development`.
 
-For each task in the plan:
+- **Multi-task plan:** delegate to `superharness:subagent-driven-development` —
+  it dispatches a fresh subagent per task so this main context stays on plan and
+  review. Each subagent does TDD and commits; you coordinate and handle BLOCKED.
+- **Trivial goal (1–2 steps) or tightly-coupled tasks:** implement inline here
+  with `superharness:test-driven-development` (no subagent overhead).
+
+Either way, every task follows TDD with no exceptions:
 
 1. **RED** — write the failing test first. Run it. Confirm it fails for the expected reason.
 2. **GREEN** — write the minimal implementation. Run the test. Confirm it passes.
 3. **REFACTOR** — clean up while keeping tests green.
 4. **Commit** with a descriptive message.
 
-If you wrote implementation code before its test: delete it, write the test, start over.
+If implementation code was written before its test: delete it, write the test, start over.
 If anything behaves unexpectedly, switch to `superharness:systematic-debugging` —
 no guess-and-patch fixes.
+
+> Trace note: implementer subagents do not write trace markers. The main agent
+> still writes `outcome.json` in Phase 3 and the Stop hook records the round, so
+> tracing is unchanged.
 
 ## Phase 3 — Verify
 
