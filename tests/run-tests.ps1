@@ -329,6 +329,16 @@ Assert-True ((Invoke-Installer -TargetDir (New-TempProject) -Template 'bogus') -
 Assert-True ((Invoke-Installer -TargetDir (New-TempProject) -Template 'frontend' -Stack 'python') -ne 0) "invalid stack for template exits non-zero"
 Assert-True ((Invoke-Installer -TargetDir (New-TempProject) -Template 'fullstack' -Stack 'react') -ne 0) "fullstack + --stack exits non-zero"
 
+# 9f2. malformed input -> non-zero exit (don't silently plain-install)
+$InstallScriptRef = $InstallScript
+function Invoke-Raw { param([string]$TargetDir, [string[]]$ExtraArgs)
+    & powershell -NoProfile -ExecutionPolicy Bypass -File $InstallScriptRef -TargetDir $TargetDir @ExtraArgs | Out-Null
+    return $LASTEXITCODE
+}
+Assert-True ((Invoke-Raw (New-TempProject) @('--template=')) -ne 0) "empty --template= exits non-zero"
+Assert-True ((Invoke-Raw (New-TempProject) @('--template')) -ne 0) "bare --template (no value) exits non-zero"
+Assert-True ((Invoke-Raw (New-TempProject) @('--stack=vue')) -ne 0) "--stack without --template exits non-zero"
+
 # 9g. backward compat: no --template -> no STACK.md
 $pnone = New-TempProject
 Invoke-Installer -TargetDir $pnone | Out-Null

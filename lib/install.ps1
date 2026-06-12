@@ -27,9 +27,24 @@ if (-not (Test-Path $TargetDir)) {
 
 # --- Parse optional --template / --stack from forwarded CLI args ---
 $Template = $null; $Stack = $null
+$sawTemplateFlag = $false; $sawStackFlag = $false
 foreach ($a in $Rest) {
-    if ($a -match '^--template=(.+)$') { $Template = $Matches[1].ToLower() }
-    elseif ($a -match '^--stack=(.+)$') { $Stack = $Matches[1].ToLower() }
+    if ($a -match '^--template($|=)') {
+        $sawTemplateFlag = $true
+        if ($a -match '^--template=(.+)$') { $Template = $Matches[1].ToLower() }
+    }
+    elseif ($a -match '^--stack($|=)') {
+        $sawStackFlag = $true
+        if ($a -match '^--stack=(.+)$') { $Stack = $Matches[1].ToLower() }
+    }
+}
+if ($sawTemplateFlag -and -not $Template) {
+    Write-Error "--template requires a value. Valid: frontend, backend, fullstack."
+    exit 1
+}
+if ($sawStackFlag -and -not $Template) {
+    Write-Error "--stack requires --template (stack is meaningless without a template)."
+    exit 1
 }
 
 # resolved stack-doc id, or $null when no --template given
