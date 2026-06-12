@@ -540,6 +540,36 @@ $resumeMd2 = Get-Content (Join-Path $plugin 'skills\resume\SKILL.md') -Raw
 Assert-True ($resumeMd2 -match 'task\.json') "resume skill references the task.json marker"
 Assert-True ($resumeMd2 -match '(?i)re-create|re-bootstrap|recreate') "resume skill re-bootstraps task.json so attempts are recorded"
 
+# ---------------------------------------------------------------- Test group 18: subagent-driven + worktree skills
+Write-Host "`n[18] Subagent-driven implementation and worktree isolation skills"
+
+# using-git-worktrees skill
+$wtPath = Join-Path $plugin 'skills\using-git-worktrees\SKILL.md'
+Assert-True (Test-Path $wtPath) "ships skills/using-git-worktrees/SKILL.md"
+$wtMd = if (Test-Path $wtPath) { Get-Content $wtPath -Raw } else { '' }
+Assert-True ($wtMd -match 'git worktree') "worktree skill uses git worktree"
+Assert-True ($wtMd -match '(?i)not a git|no git repo|work in place') "worktree skill degrades when there is no git repo"
+Assert-True ($wtMd -match '(?i)by default') "worktree skill documents create-by-default for go"
+
+# subagent-driven-development skill
+$sdPath = Join-Path $plugin 'skills\subagent-driven-development\SKILL.md'
+Assert-True (Test-Path $sdPath) "ships skills/subagent-driven-development/SKILL.md"
+$sdMd = if (Test-Path $sdPath) { Get-Content $sdPath -Raw } else { '' }
+Assert-True ($sdMd -match '(?i)fresh subagent') "subagent skill dispatches a fresh subagent per task"
+Assert-True ($sdMd -match 'superharness:test-driven-development') "subagent skill delegates TDD to test-driven-development"
+Assert-True ($sdMd -match '(?i)self-review') "subagent skill keeps per-task review to self-review only"
+
+# go wires both phases in
+$goMd3 = Get-Content (Join-Path $plugin 'skills\go\SKILL.md') -Raw
+Assert-True ($goMd3 -match 'using-git-worktrees') "go skill delegates isolation to using-git-worktrees"
+Assert-True ($goMd3 -match 'subagent-driven-development') "go skill delegates Phase 2 to subagent-driven-development"
+Assert-True ($goMd3 -match '(?i)Phase 0.5|Isolate') "go skill adds the Isolate phase"
+
+# HARNESS lists both
+$harnessDoc2 = Get-Content (Join-Path $plugin 'HARNESS.md') -Raw
+Assert-True ($harnessDoc2 -match 'using-git-worktrees') "HARNESS.md lists using-git-worktrees"
+Assert-True ($harnessDoc2 -match 'subagent-driven-development') "HARNESS.md lists subagent-driven-development"
+
 # ---------------------------------------------------------------- cleanup + summary
 Remove-Item $proj, $proj2, $proj3, $proj4, $emptyDir -Recurse -Force -ErrorAction SilentlyContinue
 
