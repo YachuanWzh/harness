@@ -190,3 +190,31 @@ test('POST node:edit appends to state/edits, not state/events', async t => {
   assert.ok(!fs.existsSync(path.join(session, 'state', 'events'))
     || fs.readFileSync(path.join(session, 'state', 'events'), 'utf-8') === '');
 });
+
+test('POST submit goes to state/edits and survives a snapshot push', async t => {
+  const { info, session } = await startServer(t);
+  const ws = await wsConnect(info.port);
+  t.after(() => ws.socket.destroy());
+  await ws.nextMessage(); // initial snapshot
+
+  // a saved edit + a submit marker
+  await fetch(info.url + '/event', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ type: 'node:edit', id: 'n1', label: 'L', note: 'N', timestamp: 1 }),
+  });
+  await fetch(info.url + '/event', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ type: 'submit', timestamp: 2 }),
+  });
+
+  // push a snapshot — this clears events but must NOT clear edits
+  const snapshot = { type: 'mindmap:snapshot', rev: 1, topic: 't', status: 'exploring',
+    root: { id: 'root', label: 't', kind: 'topic' } };
+  fs.writeFileSync(path.join(session, 'content', 'mindmap.json'), JSON.stringify(snapshot));
+  const pushed = JSON.parse(await ws.nextMessage());
+  assert.equal(pushed.rev, 1);
+
+  const edits = fs.readFileSync(path.join(session, 'state', 'edits'), 'utf-8').trim().split('\n');
+  assert.equal(edits.length, 2);
+  assert.equal(JSON.parse(edits[1]).type, 'submit');
+});
