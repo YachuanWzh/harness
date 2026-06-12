@@ -11,6 +11,9 @@
 核心技能内容移植自 [obra/superpowers](https://github.com/obra/superpowers)（MIT License），
 并为自主工作流做了适配。
 
+> 📐 想快速看懂整体设计（含架构图、安装/会话/脑图流程图）？见
+> [技术方案文档.md](技术方案文档.md)。
+
 这会把 `bin\` 目录加入用户 PATH（幂等、追加式，不会截断已有 PATH）。**打开新终端后生效。**
 
 > 卸载：从用户环境变量 PATH 中删除该 bin 路径即可；已初始化的项目删除
