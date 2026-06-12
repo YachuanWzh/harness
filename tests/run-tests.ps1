@@ -520,6 +520,18 @@ Assert-True ($goMd -match 'task\.json') "go skill documents the task.json bootst
 Assert-True ($goMd -match 'outcome\.json') "go skill documents the outcome.json marker"
 Assert-True ($goMd -match 'task_status') "go skill documents closing the trace with task_status"
 
+# ---------------------------------------------------------------- Test group 16: resume skill
+Write-Host "`n[16] resume skill is present, manual-only, and drives a root-cause fix"
+$resumePath = Join-Path $plugin 'skills\resume\SKILL.md'
+Assert-True (Test-Path $resumePath) "ships skills/resume/SKILL.md"
+$resumeMd = if (Test-Path $resumePath) { Get-Content $resumePath -Raw } else { '' }
+Assert-True ($resumeMd -match 'disable-model-invocation:\s*true') "resume skill is manual-only"
+Assert-True ($resumeMd -match 'superharness/trace') "resume skill reads the trace files"
+Assert-True ($resumeMd -match '(?i)root cause') "resume skill drives a root-cause fix, not a blind retry"
+Assert-True ($resumeMd -match 'systematic-debugging') "resume skill invokes systematic-debugging"
+Assert-True ($resumeMd -match 'verification-before-completion') "resume skill verifies before claiming done"
+Assert-True ($resumeMd -notmatch 'superpowers:') "resume skill uses the superharness namespace"
+
 # ---------------------------------------------------------------- cleanup + summary
 Remove-Item $proj, $proj2, $proj3, $proj4, $emptyDir -Recurse -Force -ErrorAction SilentlyContinue
 
