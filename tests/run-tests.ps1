@@ -513,6 +513,13 @@ Assert-True (-not (Test-Path (Join-Path $cc 'superharness\trace\.state\task.json
 
 Remove-Item $cf, $cc -Recurse -Force -ErrorAction SilentlyContinue
 
+# ---------------------------------------------------------------- Test group 15: go skill documents the trace markers
+Write-Host "`n[15] go skill writes task.json / outcome.json markers"
+$goMd = Get-Content (Join-Path $plugin 'skills\go\SKILL.md') -Raw
+Assert-True ($goMd -match 'task\.json') "go skill documents the task.json bootstrap marker"
+Assert-True ($goMd -match 'outcome\.json') "go skill documents the outcome.json marker"
+Assert-True ($goMd -match 'task_status') "go skill documents closing the trace with task_status"
+
 # ---------------------------------------------------------------- cleanup + summary
 Remove-Item $proj, $proj2, $proj3, $proj4, $emptyDir -Recurse -Force -ErrorAction SilentlyContinue
 

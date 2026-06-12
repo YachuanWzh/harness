@@ -36,6 +36,9 @@ partner (destructive actions, ambiguous product choices). Everything else, decid
   implementation → verify GREEN → commit.
 - Trivial goals (1–2 steps) may skip the plan file but NOT the TDD cycle.
 - Create one TodoWrite/Task item per plan task and keep statuses current.
+- **Trace bootstrap.** At task start, write `superharness/trace/.state/task.json`
+  (single-line JSON) with `{"task_id":"<YYYY-MM-DD-slug>","slug":"<YYYY-MM-DD-slug>","goal":"<one-line goal>","started_at":"<ISO8601>"}`.
+  This activates per-round tracking — the Stop hook is a no-op until it exists.
 
 ## Phase 2 — Implement (TDD, no exceptions)
 
@@ -57,6 +60,12 @@ no guess-and-patch fixes.
 **REQUIRED SUB-SKILL:** `superharness:verification-before-completion`
 
 - Run the FULL test suite, not just the new tests. Paste actual output.
+- **Outcome marker.** Each time you run the test suite, before yielding control,
+  write `superharness/trace/.state/outcome.json` (single-line JSON) describing the latest result:
+  - all green → `{"outcome":"success","test_command":"<cmd>"}`
+  - one or more failing → `{"outcome":"failure","test_command":"<cmd>","failing_tests":[{"name":"<test>","file":"<path>","message":"<assertion>"}],"notes":"<short>"}`
+  - no tests this round (e.g. a clarifying question) → omit the marker; the round is recorded as `in_progress`.
+  The Stop hook consumes this marker each round.
 - Run linters/builds the project defines.
 - Any failure → back to Phase 2 (or systematic-debugging). Never report partial success
   as success.
@@ -78,6 +87,11 @@ Deliver a final summary containing:
 - Evidence: test commands run and their actual results
 - Review outcome and what was fixed
 - Assumptions made and any noted Minor issues / follow-ups
+
+**Close the trace.** On final completion, write `superharness/trace/.state/outcome.json`
+with `"task_status":"completed"` (or `"failed"` / `"abandoned"`) alongside the usual
+outcome fields. The Stop hook records the final round, sets the trace `status`, and
+removes `task.json`.
 
 ## Red Flags
 
