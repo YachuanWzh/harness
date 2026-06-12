@@ -340,6 +340,32 @@ Assert-True (-not (Test-Path (Get-StackFile $pf))) "plain re-install removes a p
 
 Remove-Item $pf, $pv, $pb, $pj, $pn, $pfs, $pnone -Recurse -Force -ErrorAction SilentlyContinue
 
+# ---------------------------------------------------------------- Test group 10: hook injects STACK.md
+Write-Host "`n[10] session-start.ps1 appends STACK.md when present"
+$ph = New-TempProject
+Invoke-Installer -TargetDir $ph -Template 'frontend' -Stack 'vue' | Out-Null
+$pluginH = Get-PluginDir $ph
+$env:CLAUDE_PLUGIN_ROOT = $pluginH
+$outH = (& powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $pluginH 'hooks\session-start.ps1')) -join "`n"
+Remove-Item Env:CLAUDE_PLUGIN_ROOT -ErrorAction SilentlyContinue
+$ctxH = ''
+try { $ctxH = ($outH | ConvertFrom-Json).hookSpecificOutput.additionalContext } catch {}
+Assert-True ($ctxH -match 'superharness') "hook still injects HARNESS.md"
+Assert-True ($ctxH -match 'Vue') "hook appends STACK.md (Vue) when present"
+
+# absent STACK.md -> unchanged (no stack marker)
+$ph2 = New-TempProject
+Invoke-Installer -TargetDir $ph2 | Out-Null
+$pluginH2 = Get-PluginDir $ph2
+$env:CLAUDE_PLUGIN_ROOT = $pluginH2
+$outH2 = (& powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $pluginH2 'hooks\session-start.ps1')) -join "`n"
+Remove-Item Env:CLAUDE_PLUGIN_ROOT -ErrorAction SilentlyContinue
+$ctxH2 = ''
+try { $ctxH2 = ($outH2 | ConvertFrom-Json).hookSpecificOutput.additionalContext } catch {}
+Assert-True ($ctxH2 -notmatch 'Frontend stack:') "hook omits stack guidance when no STACK.md"
+
+Remove-Item $ph, $ph2 -Recurse -Force -ErrorAction SilentlyContinue
+
 # ---------------------------------------------------------------- cleanup + summary
 Remove-Item $proj, $proj2, $proj3, $proj4, $emptyDir -Recurse -Force -ErrorAction SilentlyContinue
 

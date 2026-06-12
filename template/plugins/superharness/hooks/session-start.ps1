@@ -16,6 +16,15 @@ if (-not $content) { exit 0 }
 
 $context = "<EXTREMELY_IMPORTANT>`nYou have superharness. Follow it for all engineering work in this project.`n`n$content`n</EXTREMELY_IMPORTANT>"
 
+# Append the active tech-stack guidance (STACK.md lives at <marketplace root> = pluginRoot\..\..).
+$stackPath = Join-Path (Split-Path -Parent (Split-Path -Parent $pluginRoot)) 'STACK.md'
+if (Test-Path $stackPath) {
+    $stackContent = Get-Content $stackPath -Raw -Encoding UTF8
+    if ($stackContent) {
+        $context += "`n`n<EXTREMELY_IMPORTANT>`nThis project targets a specific tech stack. Follow this guidance.`n`n$stackContent`n</EXTREMELY_IMPORTANT>"
+    }
+}
+
 $payload = @{
     hookSpecificOutput = @{
         hookEventName     = 'SessionStart'
