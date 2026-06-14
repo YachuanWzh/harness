@@ -119,8 +119,9 @@ superharness --template=fullstack           :: 固定 React + Python（不接受
 `brainstorm` 技能启动一个零依赖 Node 本地服务器并在浏览器打开**实时脑图**，全程伴随
 需求澄清与方案讨论：每提一个问题/确定一个决策，Claude 就把脑图结构推送到页面。脑图支持
 **拖拽平移、滚轮缩放、双击复位**；节点按类型着色、按状态高亮（已选/淘汰/已定）；点击节点可
-把选择反馈给 Claude。流程结束生成设计文档到 `superharness/specs/`，并提示你可转
-`/superharness:go` 实施。
+把选择反馈给 Claude。**双击节点**可弹出编辑面板修改 `label`/`note`，保存后界面即时更新（乐观
+更新），点顶栏「提交」按钮把修改批量发回 Claude 并入设计。流程结束生成设计文档到
+`superharness/specs/`，并提示你可转 `/superharness:go` 实施。
 
 消息协议（详见
 [设计文档](docs/superpowers/specs/2026-06-12-superharness-plugin-and-brainstorm-design.md)）：
@@ -128,7 +129,9 @@ superharness --template=fullstack           :: 固定 React + Python（不接受
 - **Claude → 前端**：把全量快照写入 `<session>/content/mindmap.json`（`mindmap:snapshot`，
   含 `rev`/`status`/树形 `root`），服务器监听文件变化后经 WebSocket 推送。
 - **前端 → Claude**：节点点击经 `POST /event` 落盘 `<session>/state/events`（JSONL，
-  `node:click`），Claude 下一轮读取并结合终端文字理解意图。
+  `node:click`），Claude 下一轮读取并结合终端文字理解意图；节点编辑与提交经
+  `POST /event` 落盘 `<session>/state/edits`（JSONL，`node:edit` / `submit`），
+  与点击管道分离，不随快照推送清空——等 Claude 合并后才清。
 
 脑图不可用时（如无 Node）流程自动降级为纯终端，绝不阻塞脑暴。会话产物落在
 `.superharness/`（已加入 `.gitignore`）。
@@ -180,7 +183,7 @@ superharness\
 :: 安装器 + 钩子（PowerShell，零依赖）
 powershell -NoProfile -ExecutionPolicy Bypass -File tests\run-tests.ps1
 
-:: 脑图服务器 + 布局纯函数（需 Node ≥ 18，17 个用例）
+:: 脑图服务器 + 布局纯函数（需 Node ≥ 18，24 个用例）
 node --test tests\
 ```
 
@@ -189,7 +192,8 @@ PowerShell 套件覆盖：安装产物完整性、marketplace.json/plugin.json/h
 无残留、SessionStart 钩子的 JSON 输出与容错、brainstorm 技能与脚本就位、start/stop 服务器脚本、
 任务追踪钩子（UserPromptSubmit 捕获、Stop 的成功/失败/in_progress 落盘与容错）、resume 技能就位。
 Node 套件覆盖：脑图树布局（确定性、无重叠、左右分布）、服务器 HTTP 端点与 server-info、
-事件落盘、WebSocket 快照推送与文件监听、空闲自动退出。
+事件落盘、WebSocket 快照推送与文件监听、空闲自动退出、节点编辑协议（node:edit/submit 分流
+至 state/edits、乐观更新清空时机、编辑面板 UI 就位）。
 
 修改 `template\` 后无需重新安装本仓库——下次在项目里运行 `superharness` 即覆盖更新（安装器会
 把插件 `version` 写为当前模板版本，确保 Claude Code 重新拉取缓存）；已初始化项目中改动插件文件后，
