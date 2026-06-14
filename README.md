@@ -14,17 +14,36 @@
 > 📐 想快速看懂整体设计（含架构图、安装/会话/脑图流程图）？见
 > [技术方案文档.md](技术方案文档.md)。
 
-这会把 `bin\` 目录加入用户 PATH（幂等、追加式，不会截断已有 PATH）。**打开新终端后生效。**
+## 安装
 
-> 卸载：从用户环境变量 PATH 中删除该 bin 路径即可；已初始化的项目删除
-> `.claude\superharness\`、`.claude\settings.json` 中的 superharness marketplace/插件条目，
-> 以及 CLAUDE.md 中的 SUPERHARNESS 标记段。
+### 全局安装（推荐，一次性）
+
+把 superharness 安装到 `%LOCALAPPDATA%\superharness\`，之后在任何目录都能直接使用——删掉 clone 仓库也不影响：
+
+```cmd
+powershell -NoProfile -ExecutionPolicy Bypass -File install-global.ps1
+```
+
+打开**新终端**后，在任意项目目录执行 `superharness` 即可初始化。
+
+> 更新：拉取新版 clone 后重新运行上述命令覆盖即可。
+> 卸载：删除 `%LOCALAPPDATA%\superharness\`，并从用户环境变量 PATH 中移除对应的 `bin\` 路径。
+
+### 本地 PATH（轻量替代）
+
+如果不想复制文件、希望始终用 clone 里的最新版，也可以直接把 clone 仓库的 `bin\` 加入 PATH：
+
+```cmd
+setup.cmd
+```
+
+> 缺点是 clone 仓库删掉后 `superharness` 命令会失效。切回全局安装只需再跑一次 `install-global.ps1`，旧路径会自动清理。
 
 ## 使用方法
 
-### 1. 初始化项目（命令行）
+### 1. 初始化项目
 
-在任意项目根目录下（cmd 或 PowerShell 均可）：
+安装完成后，在任意项目根目录下（cmd 或 PowerShell 均可）：
 
 ```cmd
 superharness
