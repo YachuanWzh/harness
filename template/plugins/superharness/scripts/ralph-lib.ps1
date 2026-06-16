@@ -20,6 +20,28 @@ function Get-RalphDir {
 
 function Get-RalphIso { (Get-Date).ToString('yyyy-MM-ddTHH:mm:sszzz') }
 
+function Get-RalphGoInvocation {
+    # Parse a UserPromptSubmit prompt. If it is a `/superharness:go <goal>` invocation
+    # (leading slash optional, must be at the start of the prompt), return
+    # { Goal; Slug='YYYY-MM-DD-<kebab|task-HHmmss>' }; otherwise return $null. Pure.
+    param(
+        [Parameter(Mandatory)][AllowEmptyString()][string]$Prompt,
+        [datetime]$Now = (Get-Date)
+    )
+    if ($null -eq $Prompt) { return $null }
+    $m = [regex]::Match($Prompt, '^\s*/?superharness:go\b[ \t]*(?<goal>[\s\S]*)$')
+    if (-not $m.Success) { return $null }
+    $goal = $m.Groups['goal'].Value.Trim()
+    $date = $Now.ToString('yyyy-MM-dd')
+    $tokens = [regex]::Matches($goal.ToLower(), '[a-z0-9]+') | ForEach-Object { $_.Value }
+    if ($tokens.Count -gt 0) {
+        $kebab = (@($tokens) | Select-Object -First 6) -join '-'
+    } else {
+        $kebab = 'task-' + $Now.ToString('HHmmss')
+    }
+    [PSCustomObject]@{ Goal = $goal; Slug = "$date-$kebab" }
+}
+
 function New-RalphDir {
     param([string]$Root)
     $dir = Get-RalphDir $Root

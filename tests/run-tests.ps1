@@ -650,6 +650,37 @@ Assert-True ($readmeRalph -match '.claude/superharness/ralph/') "README document
 Assert-True ($readmeRalph -match '\.current-task' -and $readmeRalph -match 'trace\.jsonl' -and $readmeRalph -match '\.ralph-state\.json') "README documents all four ralph files"
 Assert-True ($readmeRalph -match 'Get-RalphResumeContext') "README documents the cold-start resume context function"
 
+# ---------------------------------------------------------------- Test group 19: Get-RalphGoInvocation parser
+Write-Host "`n[19] Get-RalphGoInvocation detects a /superharness:go prompt and derives a dated slug"
+$fixedNow = [datetime]'2026-06-16T10:00:00'
+
+$gi1 = Get-RalphGoInvocation -Prompt '/superharness:go fix the login bug' -Now $fixedNow
+Assert-True ($null -ne $gi1) "matches a slash go invocation"
+Assert-True ($gi1.Goal -eq 'fix the login bug') "extracts the goal text"
+Assert-True ($gi1.Slug -eq '2026-06-16-fix-the-login-bug') "derives a dated kebab slug from the goal"
+
+$gi2 = Get-RalphGoInvocation -Prompt 'superharness:go Fix the Login-Bug #42' -Now $fixedNow
+Assert-True ($null -ne $gi2) "matches without the leading slash"
+Assert-True ($gi2.Slug -eq '2026-06-16-fix-the-login-bug-42') "slug lowercases and tokenizes punctuation"
+
+$gi3 = Get-RalphGoInvocation -Prompt '/superharness:go one two three four five six seven eight' -Now $fixedNow
+Assert-True (($gi3.Slug -split '-').Count -le 9) "slug caps the number of goal tokens (date + <=6)"
+
+$gi4 = Get-RalphGoInvocation -Prompt 'please run /superharness:go later' -Now $fixedNow
+Assert-True ($null -eq $gi4) "does not match when go is not at the start of the prompt"
+
+$gi5 = Get-RalphGoInvocation -Prompt 'just a normal question about superharness' -Now $fixedNow
+Assert-True ($null -eq $gi5) "does not match a normal prompt"
+
+$gi6 = Get-RalphGoInvocation -Prompt '/superharness:go 修复登录问题' -Now $fixedNow
+Assert-True ($null -ne $gi6) "matches a non-ASCII (Chinese) goal"
+Assert-True ($gi6.Goal -eq '修复登录问题') "preserves the original goal text"
+Assert-True ($gi6.Slug -eq '2026-06-16-task-100000') "falls back to a timestamped slug when no ASCII tokens"
+
+$gi7 = Get-RalphGoInvocation -Prompt '/superharness:go' -Now $fixedNow
+Assert-True ($null -ne $gi7 -and $gi7.Goal -eq '') "matches a bare invocation with empty goal"
+Assert-True ($gi7.Slug -eq '2026-06-16-task-100000') "bare invocation also falls back to a timestamped slug"
+
 # ---------------------------------------------------------------- cleanup + summary
 Remove-Item $proj, $proj2, $proj3, $proj4, $emptyDir -Recurse -Force -ErrorAction SilentlyContinue
 
