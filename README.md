@@ -98,36 +98,29 @@ superharness --template=fullstack           :: 固定 React + Python（不接受
 5. **验证** —— `verification-before-completion`：跑完整测试套件，贴出真实输出
 6. **审查** —— `requesting-code-review`：派子代理审查 diff，严重问题阻塞收尾
 
-### 4. 任务过程跟踪与恢复（resume）
+### 4. 任务过程跟踪与自动重试
 
-`go` 执行过程中，**每一轮需要用户介入的对话都会被自动记录**到每任务一个的单行最小化 JSON：
-`superharness/trace/<YYYY-MM-DD-slug>.json`。记录由两个钩子负责，不依赖 Claude 记忆：
+`go` 的任务跟踪**直接构建在下文的 Ralph 状态机制之上**（`superharness/ralph/`），不再使用旧的
+`superharness/trace/<slug>.json` + `outcome.json` 机制，也不再需要手动的 `resume` 技能。
 
-- **UserPromptSubmit 钩子**无条件捕获该轮的用户 query 与时间戳；
-- **Stop 钩子**在 Claude 交还控制权时合成该轮记录并追加进 trace 文件，随后消费临时标记。
+跟踪采用**混合式**，既可靠又有细粒度：
 
-成败主要看 **test case**（由 `go` 在跑完测试后写的 `outcome.json` 标记决定）：
+- **go 工作流（主代理）写执行事件**：在 Phase 1 用 `Set-RalphCurrentTask` 写 `.current-task`、
+  `Initialize-RalphTasks` 写 `task.json` 任务清单；在各阶段边界用 `Add-RalphTrace` 向
+  `trace.jsonl` 追加 `red/green/commit/verify:*` 等事件，并用 `Set-RalphTaskStatus` 翻子任务状态。
+- **Stop 钩子兜底**：每当 Claude 交还控制权，只要 `.current-task` 存在，钩子就向 `trace.jsonl`
+  追加一条 `round` 心跳（query 来自 UserPromptSubmit 暂存的 `.pending-prompt.json`），保证
+  "每一轮都被记录"——即便该轮主代理没写任何执行事件。
 
-| 该轮情况 | 记录内容 |
-|----------|----------|
-| 跑了测试且全绿 | `outcome:"success"`，仅记 `task completed` |
-| 跑了测试且有失败 | `outcome:"failure"`，记失败用例（名称/文件/消息）+ query + 时间 + `test_command` |
-| 该轮没跑测试 / 标记缺失 | `outcome:"in_progress"`，记 query + 时间 + 一句话摘要（确保"每轮都被记录"无条件成立） |
+**失败即在同一次 go 内自动重试**（不再等人确认）：跑完全量测试后，全绿则记 `verify:success`、
+把子任务标 `done`、`Reset-RalphRetry`；有失败则记 `verify:failure` 并 `Add-RalphRetry`。只要
+`Test-RalphRetryExhausted` 未触顶（`.ralph-state.json` 计数**上限 5**），就自动回到 Phase 2 走
+**复现 → 定位根因（systematic-debugging）→ 改码（TDD）→ 验证**闭环，把出问题的代码真正修好而非
+盲目重跑；触顶则停下来汇报。中断后由新 agent 冷启动续跑，靠 `Get-RalphResumeContext` 读回上下文。
 
-恢复一个未完成的任务：
-
-```
-/superharness:resume                 :: 取最近一个 status≠completed 的 trace
-/superharness:resume 2026-06-12-xxx  :: 指定 slug
-```
-
-`resume`（仅手动触发）会读回 trace、向你汇报失败用例并**等你确认**，随后走完整的
-**复现 → 定位根因（systematic-debugging）→ 改码（TDD）→ 验证**闭环，把出问题的代码真正修好，
-而非盲目重跑；每次尝试都累积进 trace。临时标记位于 `superharness/trace/.state/`（已加入 `.gitignore`）。
-
-> 约束：每个项目同一时间只跟踪 **一个活跃 go 任务**（`.state/task.json` 是单一活跃标记）。
-> 不要在同一项目里并发跑多个 `go` 任务，否则轮次会被记到错误的 trace。`resume` 恢复一个已关闭的
-> 任务时会按原 slug 重建 `task.json`，让本次修复尝试继续被记录。
+> 约束：每个项目同一时间只跟踪 **一个活跃 go 任务**（`.current-task` 是单一活跃标记）。
+> 不要在同一项目里并发跑多个 `go` 任务，否则轮次会被记到错误的 trace。`superharness/ralph/`
+> 整个目录是运行时态，已由安装器加入目标项目的 `.gitignore`。
 
 ### 5. Ralph 状态机制（可续跑的自治任务循环）
 
@@ -193,8 +186,7 @@ superharness --template=fullstack           :: 固定 React + Python（不接受
 
 | 技能 | 来源 | 触发时机 |
 |------|------|----------|
-| `superharness:go` | 本项目 | 用户给出端到端任务目标 |
-| `superharness:resume` | 本项目 | **仅手动** `/superharness:resume`，从 trace 复现并修复失败的任务 |
+| `superharness:go` | 本项目 | 用户给出端到端任务目标（含 Ralph 跟踪与同一次运行内自动重试） |
 | `superharness:brainstorm` | 本项目（流程参考 superpowers） | **仅手动** `/superharness:brainstorm`，实时脑图梳理需求设计 |
 | `superharness:writing-plans` | superpowers（适配） | 多步任务动代码之前 |
 | `superharness:using-git-worktrees` | superpowers（适配） | 动代码前需要隔离工作区（go Phase 0.5） |
@@ -217,10 +209,10 @@ superharness\
 │       ├── HARNESS.md                    # 会话启动时注入的约束规则
 │       ├── hooks\hooks.json              # SessionStart + UserPromptSubmit + Stop 钩子注册
 │       ├── hooks\session-start.ps1       # 注入 HARNESS.md 的脚本
-│       ├── hooks\trace-lib.ps1           # 追踪钩子共享辅助（最小化 JSON 读写）
-│       ├── hooks\user-prompt-submit.ps1  # 捕获每轮 query 的钩子
-│       ├── hooks\stop.ps1                # 合成并落盘每轮记录的钩子
-│       └── skills\...                    # go + resume + brainstorm + using-git-worktrees + subagent-driven-development + 5 个核心技能
+│       ├── hooks\user-prompt-submit.ps1  # 暂存每轮 query 到 superharness/ralph/.pending-prompt.json
+│       ├── hooks\stop.ps1                # 向 trace.jsonl 追加 round 心跳的钩子（基于 ralph-lib）
+│       ├── scripts\ralph-lib.ps1         # Ralph 状态库（go 跟踪 + 重试，钩子 dot-source 它）
+│       └── skills\...                    # go + brainstorm + using-git-worktrees + subagent-driven-development + 5 个核心技能
 │           └── brainstorm\scripts\       # server.cjs / mindmap.html / layout.js / start|stop-server.ps1
 ├── tests\run-tests.ps1      # 安装器/钩子测试套件（PowerShell，TDD）
 ├── tests\*.test.mjs         # 脑图服务器与布局测试（node --test）
@@ -243,7 +235,8 @@ node --test tests\
 PowerShell 套件覆盖：安装产物完整性、marketplace.json/plugin.json/hooks.json 合法性、
 `.claude/settings.json` 保留性合并与幂等、旧路径清理、CLAUDE.md 追加与幂等、命名空间替换
 无残留、SessionStart 钩子的 JSON 输出与容错、brainstorm 技能与脚本就位、start/stop 服务器脚本、
-任务追踪钩子（UserPromptSubmit 捕获、Stop 的成功/失败/in_progress 落盘与容错）、resume 技能就位。
+任务追踪钩子（UserPromptSubmit 暂存 query、Stop 向 trace.jsonl 追加 round 心跳与容错、无活跃任务时 no-op）、
+go 技能驱动 Ralph 跟踪与自动重试、安装器把 `superharness/ralph/` 写入目标 `.gitignore`、Ralph 状态库行为。
 Node 套件覆盖：脑图树布局（确定性、无重叠、左右分布）、服务器 HTTP 端点与 server-info、
 事件落盘、WebSocket 快照推送与文件监听、空闲自动退出、节点编辑协议（node:edit/submit 分流
 至 state/edits、乐观更新清空时机、编辑面板 UI 就位）。
