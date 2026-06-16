@@ -590,6 +590,43 @@ Assert-True ($ctLines2.Count -eq 1) "still one line after switch (no append)"
 Assert-True ((Get-RalphCurrentTask -Root (New-TempProject)) -eq $null) "Get-RalphCurrentTask returns null when absent"
 Remove-Item $rp1 -Recurse -Force -ErrorAction SilentlyContinue
 
+# ---------------------------------------------------------------- Test group 17b: task.json task list
+Write-Host "`n[17b] task.json holds an idempotent per-task status list"
+$rp2 = New-TempProject
+Initialize-RalphTasks -Root $rp2 -Tasks @(
+    @{ id=1; name='scaffold' },
+    @{ id=2; name='ledger'; status='done' },
+    @{ id=3; name='retry' }
+) -SprintTotal 7
+$tjPath = Join-Path $rp2 'superharness\ralph\task.json'
+Assert-True (Test-Path $tjPath) "Initialize-RalphTasks writes superharness/ralph/task.json"
+$tjLines = @((Get-Content $tjPath) | Where-Object { $_.Trim() -ne '' })
+Assert-True ($tjLines.Count -eq 1) "task.json is a single minified line"
+$tj = Get-RalphTasks -Root $rp2
+Assert-True ($tj.status -eq 'planning') "default overall status is planning"
+Assert-True ($tj.phase -eq 'implement') "default phase is implement"
+Assert-True ($tj.sprint.total -eq 7) "sprint.total recorded"
+Assert-True (@($tj.tasks).Count -eq 3) "all tasks recorded"
+Assert-True ((@($tj.tasks) | Where-Object { $_.id -eq 1 }).status -eq 'pending') "unset task defaults to pending"
+Assert-True ((@($tj.tasks) | Where-Object { $_.id -eq 2 }).status -eq 'done') "explicit done status preserved"
+Assert-True ($tj.updated_at -match '^\d{4}-\d{2}-\d{2}T') "updated_at is an ISO timestamp"
+
+$next = Get-RalphNextTask -Root $rp2
+Assert-True ($next.id -eq 1) "Get-RalphNextTask returns the first not-done task"
+
+$before = (Get-RalphTasks -Root $rp2).updated_at
+Start-Sleep -Milliseconds 1100
+Set-RalphTaskStatus -Root $rp2 -Id 1 -Status 'done'
+$tj2 = Get-RalphTasks -Root $rp2
+Assert-True ((@($tj2.tasks) | Where-Object { $_.id -eq 1 }).status -eq 'done') "Set-RalphTaskStatus flips the task status"
+Assert-True ($tj2.updated_at -ne $before) "updated_at refreshed on every write"
+Assert-True ((Get-RalphNextTask -Root $rp2).id -eq 3) "next now skips both done tasks to task 3"
+Set-RalphTaskStatus -Root $rp2 -Id 1 -Status 'done'
+Assert-True (@((Get-RalphTasks -Root $rp2).tasks).Count -eq 3) "idempotent re-set keeps the task count"
+Set-RalphTaskStatus -Root $rp2 -Id 3 -Status 'done'
+Assert-True ((Get-RalphNextTask -Root $rp2) -eq $null) "Get-RalphNextTask is null when all tasks are done"
+Remove-Item $rp2 -Recurse -Force -ErrorAction SilentlyContinue
+
 # ---------------------------------------------------------------- cleanup + summary
 Remove-Item $proj, $proj2, $proj3, $proj4, $emptyDir -Recurse -Force -ErrorAction SilentlyContinue
 
