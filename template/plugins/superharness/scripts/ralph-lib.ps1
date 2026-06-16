@@ -141,3 +141,35 @@ function Set-RalphTaskStatus {
     }
     Write-RalphJson (Get-RalphTaskPath $Root) $snapshot
 }
+
+# ---------------------------------------------------------------- trace.jsonl
+
+function Get-RalphTracePath { param([string]$Root) Join-Path (Get-RalphDir $Root) 'trace.jsonl' }
+
+function Add-RalphTrace {
+    # Append a single minified {ts,phase,event,detail} line. Never rewrites earlier
+    # lines — the worst a crash can corrupt is the final line.
+    param(
+        [Parameter(Mandatory)][string]$Root,
+        [Parameter(Mandatory)][string]$Phase,
+        [Parameter(Mandatory)][string]$Event,
+        [string]$Detail = ''
+    )
+    New-RalphDir $Root | Out-Null
+    $line = ConvertTo-Json -InputObject ([ordered]@{
+        ts = (Get-RalphIso); phase = $Phase; event = $Event; detail = $Detail
+    }) -Depth 12 -Compress
+    $enc = New-Object System.Text.UTF8Encoding($false)
+    [IO.File]::AppendAllText((Get-RalphTracePath $Root), ($line + "`n"), $enc)
+}
+
+function Get-RalphTraceTail {
+    # Return the last N events (parsed), oldest-first. Empty array if no ledger.
+    param([Parameter(Mandatory)][string]$Root, [int]$Count = 1)
+    $p = Get-RalphTracePath $Root
+    if (-not (Test-Path $p)) { return @() }
+    $lines = @(Get-Content $p -Tail $Count | Where-Object { $_.Trim() -ne '' })
+    $out = @()
+    foreach ($l in $lines) { try { $out += ($l | ConvertFrom-Json) } catch {} }
+    return $out
+}

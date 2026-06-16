@@ -627,6 +627,25 @@ Set-RalphTaskStatus -Root $rp2 -Id 3 -Status 'done'
 Assert-True ((Get-RalphNextTask -Root $rp2) -eq $null) "Get-RalphNextTask is null when all tasks are done"
 Remove-Item $rp2 -Recurse -Force -ErrorAction SilentlyContinue
 
+# ---------------------------------------------------------------- Test group 17c: trace.jsonl append-only ledger
+Write-Host "`n[17c] trace.jsonl is an append-only ledger"
+$rp3 = New-TempProject
+Add-RalphTrace -Root $rp3 -Phase 'implement' -Event 'implement:start' -Detail 'Dispatching subagent'
+$trPath = Join-Path $rp3 'superharness\ralph\trace.jsonl'
+Assert-True (Test-Path $trPath) "Add-RalphTrace creates superharness/ralph/trace.jsonl"
+$firstBytes = [IO.File]::ReadAllText($trPath)
+Add-RalphTrace -Root $rp3 -Phase 'implement' -Event 'implement:done' -Detail 'Green'
+$allLines = @((Get-Content $trPath) | Where-Object { $_.Trim() -ne '' })
+Assert-True ($allLines.Count -eq 2) "each call appends exactly one line"
+Assert-True ([IO.File]::ReadAllText($trPath).StartsWith($firstBytes)) "earlier line is byte-for-byte unchanged after append (append-only)"
+$tail = @(Get-RalphTraceTail -Root $rp3 -Count 1)
+Assert-True ($tail.Count -eq 1 -and $tail[0].event -eq 'implement:done') "Get-RalphTraceTail returns the last event"
+$tail2 = @(Get-RalphTraceTail -Root $rp3 -Count 2)
+Assert-True ($tail2.Count -eq 2 -and $tail2[0].event -eq 'implement:start' -and $tail2[1].event -eq 'implement:done') "tail preserves chronological order"
+Assert-True ($tail[0].ts -match '^\d{4}-\d{2}-\d{2}T') "trace event carries an ISO ts"
+Assert-True (@(Get-RalphTraceTail -Root (New-TempProject)).Count -eq 0) "tail of a missing trace is empty"
+Remove-Item $rp3 -Recurse -Force -ErrorAction SilentlyContinue
+
 # ---------------------------------------------------------------- cleanup + summary
 Remove-Item $proj, $proj2, $proj3, $proj4, $emptyDir -Recurse -Force -ErrorAction SilentlyContinue
 
