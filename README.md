@@ -105,9 +105,13 @@ superharness --template=fullstack           :: 固定 React + Python（不接受
 
 跟踪采用**混合式**，既可靠又有细粒度：
 
-- **go 工作流（主代理）写执行事件**：在 Phase 1 用 `Set-RalphCurrentTask` 写 `.current-task`、
-  `Initialize-RalphTasks` 写 `task.json` 任务清单；在各阶段边界用 `Add-RalphTrace` 向
-  `trace.jsonl` 追加 `red/green/commit/verify:*` 等事件，并用 `Set-RalphTaskStatus` 翻子任务状态。
+- **UserPromptSubmit 钩子自动起跑**：用户一提交 `/superharness:go <目标>`,钩子就识别出这是
+  go 调用,自动 `Start-RalphTask` —— 写 `.current-task`(slug 由目标派生)、播下空的 `task.json`、
+  并向 `trace.jsonl` 追加 `task:started`。**四个运行时文件在任务一开始就自动出现,无需主代理手动 bootstrap。**
+  换一个新目标会自动重指到新任务;重复提交同一任务则空操作。
+- **go 工作流（主代理）充实并写执行事件**:Phase 1 用 `Initialize-RalphTasks` 把空清单替换成真实
+  计划任务列表;在各阶段边界用 `Add-RalphTrace` 向 `trace.jsonl` 追加 `red/green/commit/verify:*`
+  等事件,并用 `Set-RalphTaskStatus` 翻子任务状态。
 - **Stop 钩子兜底**：每当 Claude 交还控制权，只要 `.current-task` 存在，钩子就向 `trace.jsonl`
   追加一条 `round` 心跳（query 来自 UserPromptSubmit 暂存的 `.pending-prompt.json`），保证
   "每一轮都被记录"——即便该轮主代理没写任何执行事件。

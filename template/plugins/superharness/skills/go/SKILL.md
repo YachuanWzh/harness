@@ -46,19 +46,22 @@ worktree creation fails, work in place — never block. Everything after this
   implementation → verify GREEN → commit.
 - Trivial goals (1–2 steps) may skip the plan file but NOT the TDD cycle.
 - Create one TodoWrite/Task item per plan task and keep statuses current.
-- **Ralph tracking bootstrap.** At task start, dot-source
-  `.claude/superharness/plugins/superharness/scripts/ralph-lib.ps1` and seed the
-  ralph state under `.claude/superharness/ralph/`:
-  - `Set-RalphCurrentTask -Root <project> -TaskId "<YYYY-MM-DD-slug>"` — writes the
-    `.claude/superharness/ralph/.current-task` pointer (the single active-task marker).
+- **Ralph tracking is already auto-started — you only enrich it.** The moment this
+  `/superharness:go` prompt was submitted, the UserPromptSubmit hook bootstrapped the
+  ralph state under `.claude/superharness/ralph/`: it ran `Set-RalphCurrentTask` to
+  write the `.current-task` pointer (the single active-task marker), seeded an empty
+  `task.json`, and opened `trace.jsonl` with a `task:started` event. These files
+  already exist — do NOT recreate them. Dot-source
+  `.claude/superharness/plugins/superharness/scripts/ralph-lib.ps1` and **enrich**:
   - `Initialize-RalphTasks -Root <project> -Tasks @(<one entry per plan task>) -Phase 'plan' -SprintTotal <N>`
-    — seeds `.claude/superharness/ralph/task.json` with the plan's task list (each `pending`).
+    — replace the empty list in `.claude/superharness/ralph/task.json` with the plan's
+    task list (each `pending`).
   - `Add-RalphTrace -Root <project> -Phase 'plan' -Event 'plan:done' -Detail '<one-line plan summary>'`
-    — opens the `.claude/superharness/ralph/trace.jsonl` execution ledger.
-  This activates per-round tracking — the Stop hook records a `round` heartbeat each
-  round only while `.current-task` exists. Track **one active go task per project**
-  at a time: `.current-task` is the single active-task marker, so do not run concurrent
-  `go` tasks in the same project (a new task overwrites the pointer).
+    — append to the `.claude/superharness/ralph/trace.jsonl` execution ledger.
+  The Stop hook records a `round` heartbeat each round while `.current-task` exists.
+  Track **one active go task per project** at a time: `.current-task` is the single
+  active-task marker, so do not run concurrent `go` tasks in the same project (a new
+  go invocation auto-repoints the pointer to a new task).
 
 ## Phase 2 — Implement (TDD, no exceptions)
 
