@@ -570,6 +570,26 @@ $harnessDoc2 = Get-Content (Join-Path $plugin 'HARNESS.md') -Raw
 Assert-True ($harnessDoc2 -match 'using-git-worktrees') "HARNESS.md lists using-git-worktrees"
 Assert-True ($harnessDoc2 -match 'subagent-driven-development') "HARNESS.md lists subagent-driven-development"
 
+# ---------------------------------------------------------------- Test group 17a: ralph-lib ships + .current-task
+Write-Host "`n[17a] ralph-lib.ps1 ships and .current-task round-trips a single line"
+$ralphLib = Join-Path $plugin 'scripts\ralph-lib.ps1'
+Assert-True (Test-Path $ralphLib) "installer ships scripts/ralph-lib.ps1"
+if (Test-Path $ralphLib) { . $ralphLib }
+
+$rp1 = New-TempProject
+Set-RalphCurrentTask -Root $rp1 -TaskId '2026-06-16-foo'
+$ctPath = Join-Path $rp1 'superharness\ralph\.current-task'
+Assert-True (Test-Path $ctPath) "Set-RalphCurrentTask writes superharness/ralph/.current-task"
+Assert-True ((Get-RalphCurrentTask -Root $rp1) -eq '2026-06-16-foo') "Get-RalphCurrentTask round-trips the id"
+$ctLines1 = @((Get-Content $ctPath) | Where-Object { $_.Trim() -ne '' })
+Assert-True ($ctLines1.Count -eq 1) ".current-task holds exactly one non-empty line"
+Set-RalphCurrentTask -Root $rp1 -TaskId '2026-06-16-bar'
+Assert-True ((Get-RalphCurrentTask -Root $rp1) -eq '2026-06-16-bar') "re-setting overwrites (switch only rewrites the line)"
+$ctLines2 = @((Get-Content $ctPath) | Where-Object { $_.Trim() -ne '' })
+Assert-True ($ctLines2.Count -eq 1) "still one line after switch (no append)"
+Assert-True ((Get-RalphCurrentTask -Root (New-TempProject)) -eq $null) "Get-RalphCurrentTask returns null when absent"
+Remove-Item $rp1 -Recurse -Force -ErrorAction SilentlyContinue
+
 # ---------------------------------------------------------------- cleanup + summary
 Remove-Item $proj, $proj2, $proj3, $proj4, $emptyDir -Recurse -Force -ErrorAction SilentlyContinue
 
