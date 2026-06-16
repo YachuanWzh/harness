@@ -646,6 +646,24 @@ Assert-True ($tail[0].ts -match '^\d{4}-\d{2}-\d{2}T') "trace event carries an I
 Assert-True (@(Get-RalphTraceTail -Root (New-TempProject)).Count -eq 0) "tail of a missing trace is empty"
 Remove-Item $rp3 -Recurse -Force -ErrorAction SilentlyContinue
 
+# ---------------------------------------------------------------- Test group 17d: .ralph-state.json retry counter
+Write-Host "`n[17d] .ralph-state.json retry counter caps at 5"
+$rp4 = New-TempProject
+$st0 = Get-RalphRetryState -Root $rp4
+Assert-True ($st0.retries -eq 0 -and $st0.max -eq 5) "defaults to retries=0, max=5 when absent"
+Assert-True (-not (Test-RalphRetryExhausted -Root $rp4)) "not exhausted at 0 retries"
+1..5 | ForEach-Object { Add-RalphRetry -Root $rp4 | Out-Null }
+$rsPath = Join-Path $rp4 'superharness\ralph\.ralph-state.json'
+Assert-True (Test-Path $rsPath) ".ralph-state.json is written"
+Assert-True ((Get-RalphRetryState -Root $rp4).retries -eq 5) "Add-RalphRetry increments and persists"
+Assert-True (Test-RalphRetryExhausted -Root $rp4) "exhausted at the cap of 5"
+Add-RalphRetry -Root $rp4 | Out-Null
+Assert-True ((Get-RalphRetryState -Root $rp4).retries -eq 5) "retries never exceed the cap of 5"
+Reset-RalphRetry -Root $rp4 | Out-Null
+Assert-True ((Get-RalphRetryState -Root $rp4).retries -eq 0) "Reset-RalphRetry returns the counter to 0"
+Assert-True (-not (Test-RalphRetryExhausted -Root $rp4)) "not exhausted after reset"
+Remove-Item $rp4 -Recurse -Force -ErrorAction SilentlyContinue
+
 # ---------------------------------------------------------------- cleanup + summary
 Remove-Item $proj, $proj2, $proj3, $proj4, $emptyDir -Recurse -Force -ErrorAction SilentlyContinue
 

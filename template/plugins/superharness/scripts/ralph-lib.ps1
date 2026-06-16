@@ -173,3 +173,48 @@ function Get-RalphTraceTail {
     foreach ($l in $lines) { try { $out += ($l | ConvertFrom-Json) } catch {} }
     return $out
 }
+
+# ---------------------------------------------------------------- .ralph-state.json (retry counter)
+
+function Get-RalphRetryPath { param([string]$Root) Join-Path (Get-RalphDir $Root) '.ralph-state.json' }
+
+function Get-RalphRetryState {
+    # Defaults to {retries:0, max:5} when the file is absent or malformed.
+    param([Parameter(Mandatory)][string]$Root)
+    $s = Read-RalphJson (Get-RalphRetryPath $Root)
+    $retries = 0; $max = 5; $upd = $null
+    if ($s) {
+        if ($null -ne $s.retries) { $retries = [int]$s.retries }
+        if ($null -ne $s.max)     { $max = [int]$s.max }
+        $upd = $s.updated_at
+    }
+    [PSCustomObject]@{ retries = $retries; max = $max; updated_at = $upd }
+}
+
+function Set-RalphRetryState {
+    param([Parameter(Mandatory)][string]$Root, [int]$Retries, [int]$Max)
+    $obj = [ordered]@{ retries = $Retries; max = $Max; updated_at = (Get-RalphIso) }
+    Write-RalphJson (Get-RalphRetryPath $Root) $obj
+    [PSCustomObject]@{ retries = $Retries; max = $Max; updated_at = $obj.updated_at }
+}
+
+function Add-RalphRetry {
+    # Increment the retry counter, clamped at max. Returns the new state.
+    param([Parameter(Mandatory)][string]$Root)
+    $st = Get-RalphRetryState $Root
+    $n = $st.retries + 1
+    if ($n -gt $st.max) { $n = $st.max }
+    Set-RalphRetryState -Root $Root -Retries $n -Max $st.max
+}
+
+function Test-RalphRetryExhausted {
+    param([Parameter(Mandatory)][string]$Root)
+    $st = Get-RalphRetryState $Root
+    return ($st.retries -ge $st.max)
+}
+
+function Reset-RalphRetry {
+    param([Parameter(Mandatory)][string]$Root)
+    $st = Get-RalphRetryState $Root
+    Set-RalphRetryState -Root $Root -Retries 0 -Max $st.max
+}
