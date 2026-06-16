@@ -681,6 +681,24 @@ $gi7 = Get-RalphGoInvocation -Prompt '/superharness:go' -Now $fixedNow
 Assert-True ($null -ne $gi7 -and $gi7.Goal -eq '') "matches a bare invocation with empty goal"
 Assert-True ($gi7.Slug -eq '2026-06-16-task-100000') "bare invocation also falls back to a timestamped slug"
 
+# ---------------------------------------------------------------- Test group 20: Start-RalphTask bootstrap
+Write-Host "`n[20] Start-RalphTask seeds all runtime files for a new task"
+$rp20 = New-TempProject
+# pre-dirty the retry counter so we can prove Start-RalphTask resets it
+Add-RalphRetry -Root $rp20 | Out-Null
+Start-RalphTask -Root $rp20 -TaskId '2026-06-16-demo-task' -Goal 'do the demo'
+$dir20 = Join-Path $rp20 '.claude\superharness\ralph'
+Assert-True ((Get-RalphCurrentTask -Root $rp20) -eq '2026-06-16-demo-task') "writes .current-task pointer"
+$tj20 = Get-RalphTasks -Root $rp20
+Assert-True ($null -ne $tj20 -and $tj20.status -eq 'planning') "writes task.json with status=planning"
+Assert-True ($tj20.phase -eq 'plan') "task.json phase is plan"
+Assert-True (@($tj20.tasks).Count -eq 0) "task.json starts with an empty task list (agent enriches later)"
+$tail20 = @(Get-RalphTraceTail -Root $rp20 -Count 1)
+Assert-True ($tail20.Count -eq 1 -and $tail20[0].event -eq 'task:started') "appends a task:started trace event"
+Assert-True ($tail20[0].detail -eq 'do the demo') "trace detail carries the goal"
+Assert-True ((Get-RalphRetryState -Root $rp20).retries -eq 0) "resets the retry counter"
+Remove-Item $rp20 -Recurse -Force -ErrorAction SilentlyContinue
+
 # ---------------------------------------------------------------- cleanup + summary
 Remove-Item $proj, $proj2, $proj3, $proj4, $emptyDir -Recurse -Force -ErrorAction SilentlyContinue
 

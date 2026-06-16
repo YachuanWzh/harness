@@ -102,7 +102,7 @@ function Initialize-RalphTasks {
     # Write the task-list snapshot. Each task defaults to status 'pending'.
     param(
         [Parameter(Mandatory)][string]$Root,
-        [Parameter(Mandatory)][object[]]$Tasks,
+        [Parameter(Mandatory)][AllowEmptyCollection()][object[]]$Tasks,
         [string]$Status = 'planning',
         [string]$Phase = 'implement',
         [int]$SprintCurrent = 0,
@@ -240,6 +240,24 @@ function Reset-RalphRetry {
     param([Parameter(Mandatory)][string]$Root)
     $st = Get-RalphRetryState $Root
     Set-RalphRetryState -Root $Root -Retries 0 -Max $st.max
+}
+
+# ---------------------------------------------------------------- task bootstrap
+
+function Start-RalphTask {
+    # Auto-bootstrap a fresh go task: point .current-task, seed an empty task.json
+    # (planning/plan — the agent enriches the task list later), open the trace ledger
+    # with a task:started event, and reset the retry counter. Idempotent-ish: calling
+    # again repoints to a new TaskId and appends another task:started line.
+    param(
+        [Parameter(Mandatory)][string]$Root,
+        [Parameter(Mandatory)][string]$TaskId,
+        [string]$Goal = ''
+    )
+    Set-RalphCurrentTask -Root $Root -TaskId $TaskId
+    Initialize-RalphTasks -Root $Root -Tasks @() -Status 'planning' -Phase 'plan'
+    Add-RalphTrace -Root $Root -Phase 'plan' -Event 'task:started' -Detail $Goal
+    Reset-RalphRetry -Root $Root | Out-Null
 }
 
 # ---------------------------------------------------------------- cold-start recovery
