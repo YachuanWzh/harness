@@ -687,6 +687,13 @@ $ctxEmpty = Get-RalphResumeContext -Root (New-TempProject)
 Assert-True ($ctxEmpty.current_task -eq $null -and $ctxEmpty.next_task -eq $null -and $ctxEmpty.all_done -eq $false) "empty project yields a well-formed null context (no throw)"
 Remove-Item $rp5 -Recurse -Force -ErrorAction SilentlyContinue
 
+# ---------------------------------------------------------------- Test group 17f: README documents the mechanism
+Write-Host "`n[17f] README documents the ralph state mechanism"
+$readmeRalph = Get-Content (Join-Path $RepoRoot 'README.md') -Raw
+Assert-True ($readmeRalph -match 'superharness/ralph/') "README documents the superharness/ralph/ location"
+Assert-True ($readmeRalph -match '\.current-task' -and $readmeRalph -match 'trace\.jsonl' -and $readmeRalph -match '\.ralph-state\.json') "README documents all four ralph files"
+Assert-True ($readmeRalph -match 'Get-RalphResumeContext') "README documents the cold-start resume context function"
+
 # ---------------------------------------------------------------- cleanup + summary
 Remove-Item $proj, $proj2, $proj3, $proj4, $emptyDir -Recurse -Force -ErrorAction SilentlyContinue
 

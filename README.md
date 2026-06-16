@@ -129,7 +129,41 @@ superharness --template=fullstack           :: 固定 React + Python（不接受
 > 不要在同一项目里并发跑多个 `go` 任务，否则轮次会被记到错误的 trace。`resume` 恢复一个已关闭的
 > 任务时会按原 slug 重建 `task.json`，让本次修复尝试继续被记录。
 
-### 5. 脑图脑暴（手动触发）
+### 5. Ralph 状态机制（可续跑的自治任务循环）
+
+为支持"原 agent 中断、新 agent 冷启动续跑"，提供一套零依赖的 PowerShell 状态库
+`scripts/ralph-lib.ps1`（dot-source 即用），管理 `<项目>/superharness/ralph/` 下四个运行时文件：
+
+| 文件 | 作用 | 写入规则 |
+|------|------|----------|
+| `.current-task` | 一张纸条，记当前在忙哪个任务 | 换任务**只重写这一行** |
+| `task.json` | 任务清单快照 `{status,phase,sprint,tasks[],updated_at}`，每个子任务独立带 `status`（`pending`/`in_progress`/`done`） | 原子覆盖；每次写盘刷新 `updated_at` |
+| `trace.jsonl` | 流水账，每行一条 `{ts,phase,event,detail}` | **只追加**，从不改写前面的行——崩溃最多坏最后一行，可逐行倒查 |
+| `.ralph-state.json` | 重试计数器 `{retries,max,updated_at}` | 原子覆盖，上限 **5** 次封顶 |
+
+库函数一览：
+
+- `.current-task`：`Set-RalphCurrentTask` / `Get-RalphCurrentTask`
+- `task.json`：`Initialize-RalphTasks` / `Get-RalphTasks` / `Get-RalphNextTask`（取第一个未完成的子任务，跳过 `done`）/ `Set-RalphTaskStatus`（幂等改单个子任务状态）
+- `trace.jsonl`：`Add-RalphTrace`（追加一行）/ `Get-RalphTraceTail`（读末尾 N 条）
+- `.ralph-state.json`：`Get-RalphRetryState` / `Add-RalphRetry`（自增并封顶）/ `Test-RalphRetryExhausted` / `Reset-RalphRetry`
+- 冷启动：`Get-RalphResumeContext`
+
+**冷启动恢复流程**（新 agent 脑子空白时照此续跑）：
+
+1. 读 `.current-task` —— 知道在忙哪个任务（`Get-RalphCurrentTask`）
+2. 读 `task.json` —— 看 `tasks[]` 哪些还没打钩（`Get-RalphTasks` / `Get-RalphNextTask`）
+3. 翻 `trace.jsonl` 末尾 —— 上次最后干了啥（`Get-RalphTraceTail`）
+4. 瞄一眼 `git diff` —— 代码实际改了没
+5. **记录 vs 代码对账**：对得上 → 从第一个没打钩的子任务接着干；对不上 → **以代码为准**修正
+   `task.json`（`Set-RalphTaskStatus`）
+6. 干活，每步都：改 `task.json` + 追加 `trace.jsonl`
+
+前 1～3 步与重试状态由 `Get-RalphResumeContext` 一次性装配成结构化事实；第 4～5 步的"对账/以代码为准"
+是 agent 的判断（跑 `git diff` 后用 `Set-RalphTaskStatus` 修正）。`task.json` 是"现在长啥样"的快照，
+`trace.jsonl` 是"怎么变成这样的"，二者互补。运行时文件位于 `superharness/ralph/`（已加入 `.gitignore`）。
+
+### 6. 脑图脑暴（手动触发）
 
 ```
 /superharness:brainstorm 给登录接口设计验证码方案
