@@ -60,9 +60,12 @@ worktree creation fails, work in place — never block. Everything after this
     `Start-RalphTask -Root <project> -TaskId '<YYYY-MM-DD-slug>' -Goal '<goal>'`.
     If it already returns a task id, the hook handled it — do not recreate.
   - Then **enrich** the (now-present) state:
-  - `Initialize-RalphTasks -Root <project> -Tasks @(<one entry per plan task>) -Phase 'plan' -SprintTotal <N>`
+  - `Initialize-RalphTasks -Root <project> -Tasks @(@{ id=1; name='scaffold lib' }, @{ id=2; name='add ledger' }) -Phase 'plan' -SprintTotal <N>`
     — replace the empty list in `.claude/superharness/ralph/task.json` with the plan's
-    task list (each `pending`).
+    task list (each `pending`). **Each entry MUST be a hashtable with `id` and `name`
+    keys** — one per plan task. Passing bare strings (e.g. `@('scaffold','ledger')`)
+    silently produces empty `{id:null, name:""}` rows, because the function reads
+    `$t.id` / `$t.name` off each element. Set `-SprintTotal` to the task count.
   - `Add-RalphTrace -Root <project> -Phase 'plan' -Event 'plan:done' -Detail '<one-line plan summary>'`
     — append to the `.claude/superharness/ralph/trace.jsonl` execution ledger.
   The Stop hook records a `round` heartbeat each round while `.current-task` exists.

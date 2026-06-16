@@ -490,6 +490,7 @@ $goMd = Get-Content (Join-Path $plugin 'skills\go\SKILL.md') -Raw
 Assert-True ($goMd -match '.claude/superharness/ralph') "go skill documents the .claude/superharness/ralph/ location"
 Assert-True ($goMd -match 'Set-RalphCurrentTask' -and $goMd -match '\.current-task') "go skill sets the .current-task pointer"
 Assert-True ($goMd -match 'Initialize-RalphTasks') "go skill seeds the ralph task list"
+Assert-True ($goMd -match '@\{[^}]*id\s*=[^}]*name\s*=') "go skill shows each -Tasks entry is a hashtable with id and name keys"
 Assert-True ($goMd -match 'Add-RalphTrace' -and $goMd -match 'trace\.jsonl') "go skill records execution events to trace.jsonl"
 Assert-True ($goMd -match 'Set-RalphTaskStatus') "go skill flips per-task status as work completes"
 Assert-True ($goMd -match 'Add-RalphRetry' -and $goMd -match 'Test-RalphRetryExhausted') "go skill drives the retry counter"
