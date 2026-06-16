@@ -7,7 +7,8 @@
 #   trace.jsonl        append-only ledger, one {ts,phase,event,detail} JSON per line
 #   .ralph-state.json  retry counter {retries,max,updated_at}, capped at 5
 #
-# Dot-source this file to use the functions. Conventions match hooks/trace-lib.ps1:
+# Dot-source this file to use the functions. The trace hooks (hooks/stop.ps1,
+# hooks/user-prompt-submit.ps1) dot-source it for go task tracking. Conventions:
 # UTF-8 without BOM, atomic temp-then-move for JSON snapshots, ISO-8601 timestamps.
 
 # ---------------------------------------------------------------- paths & helpers

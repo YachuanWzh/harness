@@ -40,14 +40,12 @@ function Invoke-Installer {
 function Get-MarketDir { param([string]$ProjectDir) Join-Path $ProjectDir '.claude\superharness' }
 function Get-PluginDir { param([string]$ProjectDir) Join-Path $ProjectDir '.claude\superharness\plugins\superharness' }
 
-function New-TraceState {
-    param([string]$Cwd, $Task, $Prompt, $Outcome)
-    $sd = Join-Path $Cwd 'superharness\trace\.state'
-    New-Item -ItemType Directory -Force $sd | Out-Null
+function Set-RalphPendingPrompt {
+    param([string]$Cwd, [string]$Query, [string]$Ts = '2026-06-16T10:00:00+08:00')
+    $dir = Join-Path $Cwd 'superharness\ralph'
+    New-Item -ItemType Directory -Force $dir | Out-Null
     $u = New-Object System.Text.UTF8Encoding($false)
-    if ($Task)    { [IO.File]::WriteAllText((Join-Path $sd 'task.json'),           (ConvertTo-Json -InputObject $Task    -Depth 12 -Compress), $u) }
-    if ($Prompt)  { [IO.File]::WriteAllText((Join-Path $sd 'pending-prompt.json'), (ConvertTo-Json -InputObject $Prompt  -Depth 12 -Compress), $u) }
-    if ($Outcome) { [IO.File]::WriteAllText((Join-Path $sd 'outcome.json'),        (ConvertTo-Json -InputObject $Outcome -Depth 12 -Compress), $u) }
+    [IO.File]::WriteAllText((Join-Path $dir '.pending-prompt.json'), (ConvertTo-Json @{ ts = $Ts; query = $Query } -Compress), $u)
 }
 
 function Invoke-HookJson {
@@ -393,13 +391,20 @@ Assert-True ($ctxH2 -notmatch 'Frontend stack:') "hook omits stack guidance when
 
 Remove-Item $ph, $ph2 -Recurse -Force -ErrorAction SilentlyContinue
 
-# ---------------------------------------------------------------- Test group 11a: trace hook install (UserPromptSubmit)
-Write-Host "`n[11a] Installer registers UserPromptSubmit + ships trace-lib and the prompt hook"
+# ---------------------------------------------------------------- Test group 11: trace hooks install
+Write-Host "`n[11] Installer registers SessionStart + UserPromptSubmit + Stop and ships ralph-lib"
 $hk = Get-Content (Join-Path $plugin 'hooks\hooks.json') -Raw | ConvertFrom-Json
-Assert-True ($null -ne $hk.hooks.UserPromptSubmit) "hooks.json registers a UserPromptSubmit hook"
 Assert-True ($null -ne $hk.hooks.SessionStart) "hooks.json still registers SessionStart"
-Assert-True (Test-Path (Join-Path $plugin 'hooks\trace-lib.ps1')) "ships hooks/trace-lib.ps1"
+Assert-True ($null -ne $hk.hooks.UserPromptSubmit) "hooks.json registers a UserPromptSubmit hook"
+Assert-True ($null -ne $hk.hooks.Stop) "hooks.json registers a Stop hook"
 Assert-True (Test-Path (Join-Path $plugin 'hooks\user-prompt-submit.ps1')) "ships hooks/user-prompt-submit.ps1"
+Assert-True (Test-Path (Join-Path $plugin 'hooks\stop.ps1')) "ships hooks/stop.ps1"
+Assert-True (Test-Path (Join-Path $plugin 'scripts\ralph-lib.ps1')) "ships scripts/ralph-lib.ps1 for the hooks"
+Assert-True (-not (Test-Path (Join-Path $plugin 'hooks\trace-lib.ps1'))) "old hooks/trace-lib.ps1 is gone"
+Assert-True (-not (Test-Path (Join-Path $plugin 'skills\resume\SKILL.md'))) "resume skill is removed (auto-retry replaces manual resume)"
+
+# dot-source ralph-lib so the test process can assert on ralph state
+. (Join-Path $plugin 'scripts\ralph-lib.ps1')
 
 # ---------------------------------------------------------------- Test group 12: UserPromptSubmit behavior
 Write-Host "`n[12] user-prompt-submit.ps1 stashes the pending round under superharness/ralph/"
@@ -413,132 +418,71 @@ Assert-True ($null -ne $pj12 -and $pj12.query -eq 'hello world') "pending-prompt
 Assert-True ($null -ne $pj12 -and $pj12.ts -match '^\d{4}-\d{2}-\d{2}T') "pending-prompt captures an ISO timestamp"
 Remove-Item $cwd12 -Recurse -Force -ErrorAction SilentlyContinue
 
-# ---------------------------------------------------------------- Test group 11b: Stop hook install
-Write-Host "`n[11b] Installer registers Stop + ships stop.ps1"
-$hk2 = Get-Content (Join-Path $plugin 'hooks\hooks.json') -Raw | ConvertFrom-Json
-Assert-True ($null -ne $hk2.hooks.Stop) "hooks.json registers a Stop hook"
-Assert-True (Test-Path (Join-Path $plugin 'hooks\stop.ps1')) "ships hooks/stop.ps1"
-
-# ---------------------------------------------------------------- Test group 13: Stop hook core behavior
-Write-Host "`n[13] stop.ps1 composes and persists a round"
+# ---------------------------------------------------------------- Test group 13: Stop hook records a round heartbeat
+Write-Host "`n[13] stop.ps1 appends a round event to trace.jsonl when a go task is active"
 $stop = Join-Path $plugin 'hooks\stop.ps1'
 
-# 13a. success round -> "task completed"
+# 13a. active task -> round heartbeat appended, pending prompt consumed
 $c1 = New-TempProject
-New-TraceState -Cwd $c1 `
-    -Task @{ task_id='2026-06-12-x'; slug='2026-06-12-x'; goal='G'; started_at='2026-06-12T10:00:00+08:00' } `
-    -Prompt @{ ts='2026-06-12T10:01:00+08:00'; query='do the thing' } `
-    -Outcome @{ outcome='success'; test_command='npm test' }
-$e1 = Invoke-HookJson $stop @{ cwd=$c1; session_id='s1' }
-$tf1 = Join-Path $c1 'superharness\trace\2026-06-12-x.json'
-Assert-True ($e1 -eq 0) "stop exits 0 on a success round"
-Assert-True (Test-Path $tf1) "stop writes the per-task trace file"
-$raw1 = if (Test-Path $tf1) { Get-Content $tf1 -Raw } else { '' }
-Assert-True ($raw1 -notmatch "`n") "trace file is a single minified line"
-$t1 = $null; try { $t1 = $raw1 | ConvertFrom-Json } catch {}
-Assert-True ($null -ne $t1 -and @($t1.rounds).Count -eq 1) "trace has one round"
-Assert-True ($null -ne $t1 -and @($t1.rounds)[0].outcome -eq 'success') "success round outcome is success"
-Assert-True ($null -ne $t1 -and @($t1.rounds)[0].summary -eq 'task completed') "success round records 'task completed'"
-Assert-True ($null -ne $t1 -and @($t1.rounds)[0].query -eq 'do the thing') "round carries the user query"
-Assert-True (-not (Test-Path (Join-Path $c1 'superharness\trace\.state\pending-prompt.json'))) "pending-prompt consumed"
-Assert-True (-not (Test-Path (Join-Path $c1 'superharness\trace\.state\outcome.json'))) "outcome marker consumed"
+Set-RalphCurrentTask -Root $c1 -TaskId '2026-06-16-x'
+Initialize-RalphTasks -Root $c1 -Tasks @(@{ id = 1; name = 'a' }) -Phase 'implement'
+Set-RalphPendingPrompt -Cwd $c1 -Query 'do the thing'
+$e1 = Invoke-HookJson $stop @{ cwd = $c1; session_id = 's1' }
+Assert-True ($e1 -eq 0) "stop exits 0 on an active task"
+$tr1 = Join-Path $c1 'superharness\ralph\trace.jsonl'
+Assert-True (Test-Path $tr1) "stop creates/appends superharness/ralph/trace.jsonl"
+$tail1 = @(Get-RalphTraceTail -Root $c1 -Count 1)
+Assert-True ($tail1.Count -eq 1 -and $tail1[0].event -eq 'round') "appends a 'round' event"
+Assert-True ($tail1[0].detail -eq 'do the thing') "round detail carries the user query"
+Assert-True ($tail1[0].phase -eq 'implement') "round phase comes from task.json"
+Assert-True (-not (Test-Path (Join-Path $c1 'superharness\ralph\.pending-prompt.json'))) "pending-prompt consumed"
 
-# 13b. missing outcome marker -> in_progress (requirement 1 holds without the marker)
+# 13b. second round appends a second line (append-only)
+Set-RalphPendingPrompt -Cwd $c1 -Query 'round two'
+Invoke-HookJson $stop @{ cwd = $c1; session_id = 's1' } | Out-Null
+$lines1 = @((Get-Content $tr1) | Where-Object { $_.Trim() -ne '' })
+Assert-True ($lines1.Count -eq 2) "second round is appended (append-only ledger)"
+
+# 13c. active task but no pending prompt -> still records a round (empty detail)
 $c2 = New-TempProject
-New-TraceState -Cwd $c2 `
-    -Task @{ task_id='t2'; slug='t2'; goal='G2'; started_at='2026-06-12T10:00:00+08:00' } `
-    -Prompt @{ ts='2026-06-12T10:05:00+08:00'; query='clarify please' }
-Invoke-HookJson $stop @{ cwd=$c2; session_id='s2' } | Out-Null
-$t2 = Get-Content (Join-Path $c2 'superharness\trace\t2.json') -Raw | ConvertFrom-Json
-Assert-True (@($t2.rounds)[0].outcome -eq 'in_progress') "round with no marker is logged as in_progress"
-Assert-True (@($t2.rounds)[0].query -eq 'clarify please') "in_progress round still records the query"
+Set-RalphCurrentTask -Root $c2 -TaskId '2026-06-16-y'
+$e2 = Invoke-HookJson $stop @{ cwd = $c2; session_id = 's2' }
+Assert-True ($e2 -eq 0) "stop exits 0 with no pending prompt"
+$tail2 = @(Get-RalphTraceTail -Root $c2 -Count 1)
+Assert-True ($tail2.Count -eq 1 -and $tail2[0].event -eq 'round') "records a round even without a pending prompt"
+Assert-True ($tail2[0].phase -eq 'go') "phase defaults to 'go' when no task.json"
 
-# 13c. no task.json -> no-op (no trace file, stray prompt cleaned)
+# 13d. no .current-task -> no-op (no ledger, stray pending cleaned)
 $c3 = New-TempProject
-New-TraceState -Cwd $c3 -Prompt @{ ts='2026-06-12T10:00:00+08:00'; query='stray' }
-$e3 = Invoke-HookJson $stop @{ cwd=$c3; session_id='s3' }
+Set-RalphPendingPrompt -Cwd $c3 -Query 'stray'
+$e3 = Invoke-HookJson $stop @{ cwd = $c3; session_id = 's3' }
 Assert-True ($e3 -eq 0) "stop exits 0 when no task is active"
-Assert-True (-not (Test-Path (Join-Path $c3 'superharness\trace\.state\pending-prompt.json'))) "stray pending-prompt cleaned when no task"
-Assert-True ((Get-ChildItem (Join-Path $c3 'superharness\trace') -Filter *.json -ErrorAction SilentlyContinue).Count -eq 0) "no trace file created without a task"
+Assert-True (-not (Test-Path (Join-Path $c3 'superharness\ralph\trace.jsonl'))) "no trace.jsonl created without a task"
+Assert-True (-not (Test-Path (Join-Path $c3 'superharness\ralph\.pending-prompt.json'))) "stray pending-prompt cleaned when no task"
 
-# 13d. malformed / empty stdin -> exit 0, no throw
+# 13e. malformed / empty stdin -> exit 0, no throw
 $e4a = '' | & powershell -NoProfile -ExecutionPolicy Bypass -File $stop; $e4a = $LASTEXITCODE
 $e4b = 'not json' | & powershell -NoProfile -ExecutionPolicy Bypass -File $stop; $e4b = $LASTEXITCODE
 Assert-True ($e4a -eq 0) "stop exits 0 on empty stdin"
 Assert-True ($e4b -eq 0) "stop exits 0 on malformed stdin"
 
-# 13e. second round appends with incrementing round number
-New-TraceState -Cwd $c1 `
-    -Prompt @{ ts='2026-06-12T10:10:00+08:00'; query='round two' } `
-    -Outcome @{ outcome='success'; test_command='npm test' }
-Invoke-HookJson $stop @{ cwd=$c1; session_id='s1' } | Out-Null
-$t1b = Get-Content $tf1 -Raw | ConvertFrom-Json
-Assert-True (@($t1b.rounds).Count -eq 2) "second round is appended"
-Assert-True (@($t1b.rounds)[1].n -eq 2) "second round is numbered 2"
-
 Remove-Item $c1, $c2, $c3 -Recurse -Force -ErrorAction SilentlyContinue
 
-# ---------------------------------------------------------------- Test group 14: Stop hook failure + close
-Write-Host "`n[14] stop.ps1 records failures and closes the task"
-$stopF = Join-Path $plugin 'hooks\stop.ps1'
-
-# 14a. failure round -> failing_tests + query only, no full-dialogue blob
-$cf = New-TempProject
-New-TraceState -Cwd $cf `
-    -Task @{ task_id='f1'; slug='f1'; goal='G'; started_at='2026-06-12T10:00:00+08:00' } `
-    -Prompt @{ ts='2026-06-12T10:02:00+08:00'; query='make it pass' } `
-    -Outcome @{ outcome='failure'; test_command='npm test';
-                failing_tests=@(@{ name='adds two numbers'; file='sum.test.js'; message='expected 3 got 5' });
-                notes='off-by-two' }
-Invoke-HookJson $stopF @{ cwd=$cf; session_id='sf' } | Out-Null
-$tF = Get-Content (Join-Path $cf 'superharness\trace\f1.json') -Raw | ConvertFrom-Json
-$rF = @($tF.rounds)[0]
-Assert-True ($rF.outcome -eq 'failure') "failure round outcome is failure"
-Assert-True (@($rF.failing_tests)[0].name -eq 'adds two numbers') "failure round records the failing test name"
-Assert-True (@($rF.failing_tests)[0].message -eq 'expected 3 got 5') "failure round records the failing test message"
-Assert-True ($rF.query -eq 'make it pass') "failure round records the user query"
-$rNames = $rF.PSObject.Properties.Name
-Assert-True ($rNames -notcontains 'dialogue' -and $rNames -notcontains 'transcript') "failure round does not store full dialogue"
-
-# 14b. task_status closes the trace and removes task.json
-$cc = New-TempProject
-New-TraceState -Cwd $cc `
-    -Task @{ task_id='d1'; slug='d1'; goal='G'; started_at='2026-06-12T10:00:00+08:00' } `
-    -Prompt @{ ts='2026-06-12T10:09:00+08:00'; query='ship it' } `
-    -Outcome @{ outcome='success'; test_command='npm test'; task_status='completed' }
-Invoke-HookJson $stopF @{ cwd=$cc; session_id='sc' } | Out-Null
-$tC = Get-Content (Join-Path $cc 'superharness\trace\d1.json') -Raw | ConvertFrom-Json
-Assert-True ($tC.status -eq 'completed') "task_status promotes trace status to completed"
-Assert-True (-not (Test-Path (Join-Path $cc 'superharness\trace\.state\task.json'))) "task.json removed when task closes"
-
-Remove-Item $cf, $cc -Recurse -Force -ErrorAction SilentlyContinue
-
-# ---------------------------------------------------------------- Test group 15: go skill documents the trace markers
-Write-Host "`n[15] go skill writes task.json / outcome.json markers"
+# ---------------------------------------------------------------- Test group 15: go skill drives ralph tracking
+Write-Host "`n[15] go skill drives the ralph state mechanism with in-run auto-retry"
 $goMd = Get-Content (Join-Path $plugin 'skills\go\SKILL.md') -Raw
-Assert-True ($goMd -match 'task\.json') "go skill documents the task.json bootstrap marker"
-Assert-True ($goMd -match 'outcome\.json') "go skill documents the outcome.json marker"
-Assert-True ($goMd -match 'task_status') "go skill documents closing the trace with task_status"
-
-# ---------------------------------------------------------------- Test group 16: resume skill
-Write-Host "`n[16] resume skill is present, manual-only, and drives a root-cause fix"
-$resumePath = Join-Path $plugin 'skills\resume\SKILL.md'
-Assert-True (Test-Path $resumePath) "ships skills/resume/SKILL.md"
-$resumeMd = if (Test-Path $resumePath) { Get-Content $resumePath -Raw } else { '' }
-Assert-True ($resumeMd -match 'disable-model-invocation:\s*true') "resume skill is manual-only"
-Assert-True ($resumeMd -match 'superharness/trace') "resume skill reads the trace files"
-Assert-True ($resumeMd -match '(?i)root cause') "resume skill drives a root-cause fix, not a blind retry"
-Assert-True ($resumeMd -match 'systematic-debugging') "resume skill invokes systematic-debugging"
-Assert-True ($resumeMd -match 'verification-before-completion') "resume skill verifies before claiming done"
-Assert-True ($resumeMd -notmatch 'superpowers:') "resume skill uses the superharness namespace"
-
-# ---------------------------------------------------------------- Test group 17: review fixes (concurrency note + resume re-bootstrap)
-Write-Host "`n[17] docs cover single-active-task limit and resume re-bootstraps task.json"
-$goMd2 = Get-Content (Join-Path $plugin 'skills\go\SKILL.md') -Raw
-Assert-True ($goMd2 -match '(?i)one active') "go skill documents one active go task per project"
-$resumeMd2 = Get-Content (Join-Path $plugin 'skills\resume\SKILL.md') -Raw
-Assert-True ($resumeMd2 -match 'task\.json') "resume skill references the task.json marker"
-Assert-True ($resumeMd2 -match '(?i)re-create|re-bootstrap|recreate') "resume skill re-bootstraps task.json so attempts are recorded"
+Assert-True ($goMd -match 'superharness/ralph') "go skill documents the superharness/ralph/ location"
+Assert-True ($goMd -match 'Set-RalphCurrentTask' -and $goMd -match '\.current-task') "go skill sets the .current-task pointer"
+Assert-True ($goMd -match 'Initialize-RalphTasks') "go skill seeds the ralph task list"
+Assert-True ($goMd -match 'Add-RalphTrace' -and $goMd -match 'trace\.jsonl') "go skill records execution events to trace.jsonl"
+Assert-True ($goMd -match 'Set-RalphTaskStatus') "go skill flips per-task status as work completes"
+Assert-True ($goMd -match 'Add-RalphRetry' -and $goMd -match 'Test-RalphRetryExhausted') "go skill drives the retry counter"
+Assert-True ($goMd -match '(?i)auto(matic)?[- ]?retr' -and $goMd -match '5') "go skill documents in-run auto-retry capped at 5"
+Assert-True ($goMd -match '(?i)one active') "go skill documents one active go task per project"
+Assert-True ($goMd -notmatch 'superharness/trace') "go skill no longer references the old superharness/trace/ mechanism"
+Assert-True ($goMd -notmatch 'outcome\.json') "go skill no longer references outcome.json markers"
+Assert-True ($goMd -match 'using-git-worktrees') "go skill still delegates isolation to using-git-worktrees"
+Assert-True ($goMd -match 'subagent-driven-development') "go skill still delegates Phase 2 to subagent-driven-development"
 
 # ---------------------------------------------------------------- Test group 18: subagent-driven + worktree skills
 Write-Host "`n[18] Subagent-driven implementation and worktree isolation skills"

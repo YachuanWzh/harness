@@ -46,12 +46,19 @@ worktree creation fails, work in place — never block. Everything after this
   implementation → verify GREEN → commit.
 - Trivial goals (1–2 steps) may skip the plan file but NOT the TDD cycle.
 - Create one TodoWrite/Task item per plan task and keep statuses current.
-- **Trace bootstrap.** At task start, write `superharness/trace/.state/task.json`
-  (single-line JSON) with `{"task_id":"<YYYY-MM-DD-slug>","slug":"<YYYY-MM-DD-slug>","goal":"<one-line goal>","started_at":"<ISO8601>"}`.
-  This activates per-round tracking — the Stop hook is a no-op until it exists.
-  Track **one active go task per project** at a time: this file is the single
-  active-task marker, so do not run concurrent `go` tasks in the same project
-  (a new task overwrites it and rounds would be appended to the wrong trace).
+- **Ralph tracking bootstrap.** At task start, dot-source
+  `.claude/superharness/plugins/superharness/scripts/ralph-lib.ps1` and seed the
+  ralph state under `superharness/ralph/`:
+  - `Set-RalphCurrentTask -Root <project> -TaskId "<YYYY-MM-DD-slug>"` — writes the
+    `superharness/ralph/.current-task` pointer (the single active-task marker).
+  - `Initialize-RalphTasks -Root <project> -Tasks @(<one entry per plan task>) -Phase 'plan' -SprintTotal <N>`
+    — seeds `superharness/ralph/task.json` with the plan's task list (each `pending`).
+  - `Add-RalphTrace -Root <project> -Phase 'plan' -Event 'plan:done' -Detail '<one-line plan summary>'`
+    — opens the `superharness/ralph/trace.jsonl` execution ledger.
+  This activates per-round tracking — the Stop hook records a `round` heartbeat each
+  round only while `.current-task` exists. Track **one active go task per project**
+  at a time: `.current-task` is the single active-task marker, so do not run concurrent
+  `go` tasks in the same project (a new task overwrites the pointer).
 
 ## Phase 2 — Implement (TDD, no exceptions)
 
@@ -75,24 +82,28 @@ If implementation code was written before its test: delete it, write the test, s
 If anything behaves unexpectedly, switch to `superharness:systematic-debugging` —
 no guess-and-patch fixes.
 
-> Trace note: implementer subagents do not write trace markers. The main agent
-> still writes `outcome.json` in Phase 3 and the Stop hook records the round, so
-> tracing is unchanged.
+> Ralph trace note: at each task boundary, record execution events with
+> `Add-RalphTrace -Root <project> -Phase 'implement' -Event '<task-id>:<red|green|commit>' -Detail '<short>'`,
+> and flip status with `Set-RalphTaskStatus -Root <project> -Id <task-id> -Status in_progress|done`.
+> Implementer subagents do not write trace markers; the main agent records them. The
+> Stop hook independently appends a `round` heartbeat each round as a backstop.
 
 ## Phase 3 — Verify
 
 **REQUIRED SUB-SKILL:** `superharness:verification-before-completion`
 
 - Run the FULL test suite, not just the new tests. Paste actual output.
-- **Outcome marker.** Each time you run the test suite, before yielding control,
-  write `superharness/trace/.state/outcome.json` (single-line JSON) describing the latest result:
-  - all green → `{"outcome":"success","test_command":"<cmd>"}`
-  - one or more failing → `{"outcome":"failure","test_command":"<cmd>","failing_tests":[{"name":"<test>","file":"<path>","message":"<assertion>"}],"notes":"<short>"}`
-  - no tests this round (e.g. a clarifying question) → omit the marker; the round is recorded as `in_progress`.
-  The Stop hook consumes this marker each round.
+- **Record the verification + auto-retry (cap 5).** After running the FULL suite:
+  - All green → `Add-RalphTrace -Root <project> -Phase 'verify' -Event 'verify:success' -Detail '<test cmd>'`,
+    then `Set-RalphTaskStatus` the task to `done` and `Reset-RalphRetry -Root <project>`.
+  - One or more failing → `Add-RalphTrace -Root <project> -Phase 'verify' -Event 'verify:failure' -Detail '<failing test + assertion>'`,
+    then `Add-RalphRetry -Root <project>`. If `Test-RalphRetryExhausted -Root <project>`
+    is true (the counter hit the cap of 5), **stop and report** — do not loop forever.
+    Otherwise **automatically retry in this same run**: go back to Phase 2 via
+    `superharness:systematic-debugging` (reproduce → root cause → fix → re-verify). This
+    is an autonomous retry loop, not a blind re-run, and it does not pause to ask.
 - Run linters/builds the project defines.
-- Any failure → back to Phase 2 (or systematic-debugging). Never report partial success
-  as success.
+- Never report partial success as success.
 
 ## Phase 4 — Review
 
@@ -112,10 +123,12 @@ Deliver a final summary containing:
 - Review outcome and what was fixed
 - Assumptions made and any noted Minor issues / follow-ups
 
-**Close the trace.** On final completion, write `superharness/trace/.state/outcome.json`
-with `"task_status":"completed"` (or `"failed"` / `"abandoned"`) alongside the usual
-outcome fields. The Stop hook records the final round, sets the trace `status`, and
-removes `task.json`.
+**Close the trace.** On final completion, record the terminal event and clear the
+active marker: `Add-RalphTrace -Root <project> -Phase 'done' -Event 'task:completed' -Detail '<summary>'`
+(or `task:failed` / `task:abandoned`), mark the remaining tasks `done` via
+`Set-RalphTaskStatus`, and remove `superharness/ralph/.current-task` so the Stop hook
+stops recording. The full execution history stays in `superharness/ralph/trace.jsonl`
+(plus the per-round Stop-hook heartbeats) for cold-start resume via `Get-RalphResumeContext`.
 
 ## Red Flags
 
