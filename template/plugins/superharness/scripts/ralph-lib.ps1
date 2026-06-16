@@ -218,3 +218,25 @@ function Reset-RalphRetry {
     $st = Get-RalphRetryState $Root
     Set-RalphRetryState -Root $Root -Retries 0 -Max $st.max
 }
+
+# ---------------------------------------------------------------- cold-start recovery
+
+function Get-RalphResumeContext {
+    # Assemble the deterministic file-based facts a freshly-started agent needs to
+    # resume: the active pointer, the task snapshot, the first not-done task, the
+    # last ledger event, and the retry state. The agent then reconciles these
+    # against `git diff` (code wins) and fixes task.json via Set-RalphTaskStatus.
+    param([Parameter(Mandatory)][string]$Root)
+    $snap = Get-RalphTasks $Root
+    $next = Get-RalphNextTask $Root
+    $tail = @(Get-RalphTraceTail -Root $Root -Count 1)
+    $last = if ($tail.Count -gt 0) { $tail[0] } else { $null }
+    [PSCustomObject]@{
+        current_task = (Get-RalphCurrentTask $Root)
+        tasks        = $snap
+        next_task    = $next
+        last_trace   = $last
+        all_done     = [bool]($snap -and ($null -eq $next))
+        retry        = (Get-RalphRetryState $Root)
+    }
+}

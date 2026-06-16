@@ -664,6 +664,29 @@ Assert-True ((Get-RalphRetryState -Root $rp4).retries -eq 0) "Reset-RalphRetry r
 Assert-True (-not (Test-RalphRetryExhausted -Root $rp4)) "not exhausted after reset"
 Remove-Item $rp4 -Recurse -Force -ErrorAction SilentlyContinue
 
+# ---------------------------------------------------------------- Test group 17e: cold-start resume context
+Write-Host "`n[17e] Get-RalphResumeContext assembles the cold-start facts"
+$rp5 = New-TempProject
+Set-RalphCurrentTask -Root $rp5 -TaskId '2026-06-16-demo'
+Initialize-RalphTasks -Root $rp5 -Tasks @(@{id=1;name='a';status='done'},@{id=2;name='b'}) -SprintTotal 2
+Add-RalphTrace -Root $rp5 -Phase 'implement' -Event 'task1:done' -Detail 'done a'
+Add-RalphTrace -Root $rp5 -Phase 'implement' -Event 'task2:start' -Detail 'starting b'
+$ctx = Get-RalphResumeContext -Root $rp5
+Assert-True ($ctx.current_task -eq '2026-06-16-demo') "context carries the .current-task pointer"
+Assert-True ($ctx.next_task.id -eq 2) "context.next_task is the first not-done task"
+Assert-True ($ctx.last_trace.event -eq 'task2:start') "context.last_trace is the latest ledger event"
+Assert-True ($ctx.all_done -eq $false) "all_done is false while a task remains"
+Assert-True (@($ctx.tasks.tasks).Count -eq 2) "context carries the task snapshot"
+
+Set-RalphTaskStatus -Root $rp5 -Id 2 -Status 'done'
+$ctxDone = Get-RalphResumeContext -Root $rp5
+Assert-True ($ctxDone.all_done -eq $true) "all_done is true once every task is done"
+Assert-True ($ctxDone.next_task -eq $null) "next_task is null when all tasks are done"
+
+$ctxEmpty = Get-RalphResumeContext -Root (New-TempProject)
+Assert-True ($ctxEmpty.current_task -eq $null -and $ctxEmpty.next_task -eq $null -and $ctxEmpty.all_done -eq $false) "empty project yields a well-formed null context (no throw)"
+Remove-Item $rp5 -Recurse -Force -ErrorAction SilentlyContinue
+
 # ---------------------------------------------------------------- cleanup + summary
 Remove-Item $proj, $proj2, $proj3, $proj4, $emptyDir -Recurse -Force -ErrorAction SilentlyContinue
 
