@@ -1,7 +1,7 @@
 # Ralph state mechanism — zero-dependency PowerShell state library.
 #
 # Manages the four runtime files of a resumable autonomous-task loop, all under
-# <project>/superharness/ralph/ :
+# <project>/.claude/superharness/ralph/ :
 #   .current-task      one-line pointer to the active task (switch = rewrite the line)
 #   task.json          task-list snapshot {status,phase,sprint,tasks[],updated_at}
 #   trace.jsonl        append-only ledger, one {ts,phase,event,detail} JSON per line
@@ -15,7 +15,7 @@
 
 function Get-RalphDir {
     param([Parameter(Mandatory)][string]$Root)
-    Join-Path $Root 'superharness\ralph'
+    Join-Path $Root '.claude\superharness\ralph'
 }
 
 function Get-RalphIso { (Get-Date).ToString('yyyy-MM-ddTHH:mm:sszzz') }

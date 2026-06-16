@@ -100,7 +100,7 @@ superharness --template=fullstack           :: 固定 React + Python（不接受
 
 ### 4. 任务过程跟踪与自动重试
 
-`go` 的任务跟踪**直接构建在下文的 Ralph 状态机制之上**（`superharness/ralph/`），不再使用旧的
+`go` 的任务跟踪**直接构建在下文的 Ralph 状态机制之上**（`.claude/superharness/ralph/`），不再使用旧的
 `superharness/trace/<slug>.json` + `outcome.json` 机制，也不再需要手动的 `resume` 技能。
 
 跟踪采用**混合式**，既可靠又有细粒度：
@@ -119,13 +119,13 @@ superharness --template=fullstack           :: 固定 React + Python（不接受
 盲目重跑；触顶则停下来汇报。中断后由新 agent 冷启动续跑，靠 `Get-RalphResumeContext` 读回上下文。
 
 > 约束：每个项目同一时间只跟踪 **一个活跃 go 任务**（`.current-task` 是单一活跃标记）。
-> 不要在同一项目里并发跑多个 `go` 任务，否则轮次会被记到错误的 trace。`superharness/ralph/`
+> 不要在同一项目里并发跑多个 `go` 任务，否则轮次会被记到错误的 trace。`.claude/superharness/ralph/`
 > 整个目录是运行时态，已由安装器加入目标项目的 `.gitignore`。
 
 ### 5. Ralph 状态机制（可续跑的自治任务循环）
 
 为支持"原 agent 中断、新 agent 冷启动续跑"，提供一套零依赖的 PowerShell 状态库
-`scripts/ralph-lib.ps1`（dot-source 即用），管理 `<项目>/superharness/ralph/` 下四个运行时文件：
+`scripts/ralph-lib.ps1`（dot-source 即用），管理 `<项目>/.claude/superharness/ralph/` 下四个运行时文件：
 
 | 文件 | 作用 | 写入规则 |
 |------|------|----------|
@@ -154,7 +154,7 @@ superharness --template=fullstack           :: 固定 React + Python（不接受
 
 前 1～3 步与重试状态由 `Get-RalphResumeContext` 一次性装配成结构化事实；第 4～5 步的"对账/以代码为准"
 是 agent 的判断（跑 `git diff` 后用 `Set-RalphTaskStatus` 修正）。`task.json` 是"现在长啥样"的快照，
-`trace.jsonl` 是"怎么变成这样的"，二者互补。运行时文件位于 `superharness/ralph/`（已加入 `.gitignore`）。
+`trace.jsonl` 是"怎么变成这样的"，二者互补。运行时文件位于 `.claude/superharness/ralph/`（已加入 `.gitignore`）。
 
 ### 6. 脑图脑暴（手动触发）
 
@@ -209,7 +209,7 @@ superharness\
 │       ├── HARNESS.md                    # 会话启动时注入的约束规则
 │       ├── hooks\hooks.json              # SessionStart + UserPromptSubmit + Stop 钩子注册
 │       ├── hooks\session-start.ps1       # 注入 HARNESS.md 的脚本
-│       ├── hooks\user-prompt-submit.ps1  # 暂存每轮 query 到 superharness/ralph/.pending-prompt.json
+│       ├── hooks\user-prompt-submit.ps1  # 暂存每轮 query 到 .claude/superharness/ralph/.pending-prompt.json
 │       ├── hooks\stop.ps1                # 向 trace.jsonl 追加 round 心跳的钩子（基于 ralph-lib）
 │       ├── scripts\ralph-lib.ps1         # Ralph 状态库（go 跟踪 + 重试，钩子 dot-source 它）
 │       └── skills\...                    # go + brainstorm + using-git-worktrees + subagent-driven-development + 5 个核心技能
@@ -236,7 +236,7 @@ PowerShell 套件覆盖：安装产物完整性、marketplace.json/plugin.json/h
 `.claude/settings.json` 保留性合并与幂等、旧路径清理、CLAUDE.md 追加与幂等、命名空间替换
 无残留、SessionStart 钩子的 JSON 输出与容错、brainstorm 技能与脚本就位、start/stop 服务器脚本、
 任务追踪钩子（UserPromptSubmit 暂存 query、Stop 向 trace.jsonl 追加 round 心跳与容错、无活跃任务时 no-op）、
-go 技能驱动 Ralph 跟踪与自动重试、安装器把 `superharness/ralph/` 写入目标 `.gitignore`、Ralph 状态库行为。
+go 技能驱动 Ralph 跟踪与自动重试、安装器把 `.claude/superharness/ralph/` 写入目标 `.gitignore`、Ralph 状态库行为。
 Node 套件覆盖：脑图树布局（确定性、无重叠、左右分布）、服务器 HTTP 端点与 server-info、
 事件落盘、WebSocket 快照推送与文件监听、空闲自动退出、节点编辑协议（node:edit/submit 分流
 至 state/edits、乐观更新清空时机、编辑面板 UI 就位）。

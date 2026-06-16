@@ -2,9 +2,8 @@
 .superharness/
 # 任务追踪 hook 的临时态（每任务的 trace .json 保留，仅忽略中间标记）
 superharness/trace/.state/
-# Ralph 状态机制的运行时文件（.current-task / task.json / trace.jsonl / .ralph-state.json）
-superharness/ralph/
 # dogfood 安装产物（本仓库自装时生成；真正的插件源在 template/）
+# 注：Ralph 运行时文件现位于 .claude/superharness/ralph/，已被下面的 .claude/superharness/ 覆盖忽略
 # settings.json 引用上面的 marketplace 目录，二者须一起留在本地，不提交
 .claude/superharness/
 .claude/settings.json

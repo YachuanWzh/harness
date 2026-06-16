@@ -160,7 +160,7 @@ if (Test-Path $ClaudeMdPath) {
 
 # --- 5. Ensure the target ignores ralph runtime state (idempotent) ---
 $GitignorePath = Join-Path $TargetDir '.gitignore'
-$ignoreLine = 'superharness/ralph/'
+$ignoreLine = '.claude/superharness/ralph/'
 $giExisting = if (Test-Path $GitignorePath) { [IO.File]::ReadAllText($GitignorePath, $utf8) } else { '' }
 if ($giExisting -notmatch [regex]::Escape($ignoreLine)) {
     $prefix = if ($giExisting -and -not $giExisting.EndsWith("`n")) { "`r`n" } else { '' }

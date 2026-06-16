@@ -48,13 +48,13 @@ worktree creation fails, work in place — never block. Everything after this
 - Create one TodoWrite/Task item per plan task and keep statuses current.
 - **Ralph tracking bootstrap.** At task start, dot-source
   `.claude/superharness/plugins/superharness/scripts/ralph-lib.ps1` and seed the
-  ralph state under `superharness/ralph/`:
+  ralph state under `.claude/superharness/ralph/`:
   - `Set-RalphCurrentTask -Root <project> -TaskId "<YYYY-MM-DD-slug>"` — writes the
-    `superharness/ralph/.current-task` pointer (the single active-task marker).
+    `.claude/superharness/ralph/.current-task` pointer (the single active-task marker).
   - `Initialize-RalphTasks -Root <project> -Tasks @(<one entry per plan task>) -Phase 'plan' -SprintTotal <N>`
-    — seeds `superharness/ralph/task.json` with the plan's task list (each `pending`).
+    — seeds `.claude/superharness/ralph/task.json` with the plan's task list (each `pending`).
   - `Add-RalphTrace -Root <project> -Phase 'plan' -Event 'plan:done' -Detail '<one-line plan summary>'`
-    — opens the `superharness/ralph/trace.jsonl` execution ledger.
+    — opens the `.claude/superharness/ralph/trace.jsonl` execution ledger.
   This activates per-round tracking — the Stop hook records a `round` heartbeat each
   round only while `.current-task` exists. Track **one active go task per project**
   at a time: `.current-task` is the single active-task marker, so do not run concurrent
@@ -126,8 +126,8 @@ Deliver a final summary containing:
 **Close the trace.** On final completion, record the terminal event and clear the
 active marker: `Add-RalphTrace -Root <project> -Phase 'done' -Event 'task:completed' -Detail '<summary>'`
 (or `task:failed` / `task:abandoned`), mark the remaining tasks `done` via
-`Set-RalphTaskStatus`, and remove `superharness/ralph/.current-task` so the Stop hook
-stops recording. The full execution history stays in `superharness/ralph/trace.jsonl`
+`Set-RalphTaskStatus`, and remove `.claude/superharness/ralph/.current-task` so the Stop hook
+stops recording. The full execution history stays in `.claude/superharness/ralph/trace.jsonl`
 (plus the per-round Stop-hook heartbeats) for cold-start resume via `Get-RalphResumeContext`.
 
 ## Red Flags

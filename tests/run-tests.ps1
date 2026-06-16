@@ -42,7 +42,7 @@ function Get-PluginDir { param([string]$ProjectDir) Join-Path $ProjectDir '.clau
 
 function Set-RalphPendingPrompt {
     param([string]$Cwd, [string]$Query, [string]$Ts = '2026-06-16T10:00:00+08:00')
-    $dir = Join-Path $Cwd 'superharness\ralph'
+    $dir = Join-Path $Cwd '.claude\superharness\ralph'
     New-Item -ItemType Directory -Force $dir | Out-Null
     $u = New-Object System.Text.UTF8Encoding($false)
     [IO.File]::WriteAllText((Join-Path $dir '.pending-prompt.json'), (ConvertTo-Json @{ ts = $Ts; query = $Query } -Compress), $u)
@@ -407,24 +407,24 @@ Assert-True (-not (Test-Path (Join-Path $plugin 'skills\resume\SKILL.md'))) "res
 . (Join-Path $plugin 'scripts\ralph-lib.ps1')
 
 # ---------------------------------------------------------------- Test group 11g: installer ignores ralph runtime state
-Write-Host "`n[11g] Installer ensures the target ignores superharness/ralph/ runtime state"
+Write-Host "`n[11g] Installer ensures the target ignores .claude/superharness/ralph/ runtime state"
 $giPath = Join-Path $proj '.gitignore'
 Assert-True (Test-Path $giPath) "installer creates/updates .gitignore"
 $giTxt = if (Test-Path $giPath) { Get-Content $giPath -Raw } else { '' }
-Assert-True ($giTxt -match 'superharness/ralph/') ".gitignore ignores superharness/ralph/"
+Assert-True ($giTxt -match '.claude/superharness/ralph/') ".gitignore ignores .claude/superharness/ralph/"
 # idempotent: a second install must not duplicate the entry
 Invoke-Installer -TargetDir $proj | Out-Null
 $giTxt2 = Get-Content $giPath -Raw
-$giCount = ([regex]::Matches($giTxt2, 'superharness/ralph/')).Count
+$giCount = ([regex]::Matches($giTxt2, '.claude/superharness/ralph/')).Count
 Assert-True ($giCount -eq 1) "ralph ignore entry is not duplicated on re-install"
 
 # ---------------------------------------------------------------- Test group 12: UserPromptSubmit behavior
-Write-Host "`n[12] user-prompt-submit.ps1 stashes the pending round under superharness/ralph/"
+Write-Host "`n[12] user-prompt-submit.ps1 stashes the pending round under .claude/superharness/ralph/"
 $cwd12 = New-TempProject
 $ex12 = Invoke-HookJson (Join-Path $plugin 'hooks\user-prompt-submit.ps1') @{ cwd = $cwd12; session_id = 's1'; prompt = 'hello world' }
 Assert-True ($ex12 -eq 0) "user-prompt-submit exits 0"
-$pf12 = Join-Path $cwd12 'superharness\ralph\.pending-prompt.json'
-Assert-True (Test-Path $pf12) "writes superharness/ralph/.pending-prompt.json"
+$pf12 = Join-Path $cwd12 '.claude\superharness\ralph\.pending-prompt.json'
+Assert-True (Test-Path $pf12) "writes .claude/superharness/ralph/.pending-prompt.json"
 $pj12 = $null; try { $pj12 = Get-Content $pf12 -Raw | ConvertFrom-Json } catch {}
 Assert-True ($null -ne $pj12 -and $pj12.query -eq 'hello world') "pending-prompt captures the user query"
 Assert-True ($null -ne $pj12 -and $pj12.ts -match '^\d{4}-\d{2}-\d{2}T') "pending-prompt captures an ISO timestamp"
@@ -441,13 +441,13 @@ Initialize-RalphTasks -Root $c1 -Tasks @(@{ id = 1; name = 'a' }) -Phase 'implem
 Set-RalphPendingPrompt -Cwd $c1 -Query 'do the thing'
 $e1 = Invoke-HookJson $stop @{ cwd = $c1; session_id = 's1' }
 Assert-True ($e1 -eq 0) "stop exits 0 on an active task"
-$tr1 = Join-Path $c1 'superharness\ralph\trace.jsonl'
-Assert-True (Test-Path $tr1) "stop creates/appends superharness/ralph/trace.jsonl"
+$tr1 = Join-Path $c1 '.claude\superharness\ralph\trace.jsonl'
+Assert-True (Test-Path $tr1) "stop creates/appends .claude/superharness/ralph/trace.jsonl"
 $tail1 = @(Get-RalphTraceTail -Root $c1 -Count 1)
 Assert-True ($tail1.Count -eq 1 -and $tail1[0].event -eq 'round') "appends a 'round' event"
 Assert-True ($tail1[0].detail -eq 'do the thing') "round detail carries the user query"
 Assert-True ($tail1[0].phase -eq 'implement') "round phase comes from task.json"
-Assert-True (-not (Test-Path (Join-Path $c1 'superharness\ralph\.pending-prompt.json'))) "pending-prompt consumed"
+Assert-True (-not (Test-Path (Join-Path $c1 '.claude\superharness\ralph\.pending-prompt.json'))) "pending-prompt consumed"
 
 # 13b. second round appends a second line (append-only)
 Set-RalphPendingPrompt -Cwd $c1 -Query 'round two'
@@ -469,8 +469,8 @@ $c3 = New-TempProject
 Set-RalphPendingPrompt -Cwd $c3 -Query 'stray'
 $e3 = Invoke-HookJson $stop @{ cwd = $c3; session_id = 's3' }
 Assert-True ($e3 -eq 0) "stop exits 0 when no task is active"
-Assert-True (-not (Test-Path (Join-Path $c3 'superharness\ralph\trace.jsonl'))) "no trace.jsonl created without a task"
-Assert-True (-not (Test-Path (Join-Path $c3 'superharness\ralph\.pending-prompt.json'))) "stray pending-prompt cleaned when no task"
+Assert-True (-not (Test-Path (Join-Path $c3 '.claude\superharness\ralph\trace.jsonl'))) "no trace.jsonl created without a task"
+Assert-True (-not (Test-Path (Join-Path $c3 '.claude\superharness\ralph\.pending-prompt.json'))) "stray pending-prompt cleaned when no task"
 
 # 13e. malformed / empty stdin -> exit 0, no throw
 $e4a = '' | & powershell -NoProfile -ExecutionPolicy Bypass -File $stop; $e4a = $LASTEXITCODE
@@ -483,7 +483,7 @@ Remove-Item $c1, $c2, $c3 -Recurse -Force -ErrorAction SilentlyContinue
 # ---------------------------------------------------------------- Test group 15: go skill drives ralph tracking
 Write-Host "`n[15] go skill drives the ralph state mechanism with in-run auto-retry"
 $goMd = Get-Content (Join-Path $plugin 'skills\go\SKILL.md') -Raw
-Assert-True ($goMd -match 'superharness/ralph') "go skill documents the superharness/ralph/ location"
+Assert-True ($goMd -match '.claude/superharness/ralph') "go skill documents the .claude/superharness/ralph/ location"
 Assert-True ($goMd -match 'Set-RalphCurrentTask' -and $goMd -match '\.current-task') "go skill sets the .current-task pointer"
 Assert-True ($goMd -match 'Initialize-RalphTasks') "go skill seeds the ralph task list"
 Assert-True ($goMd -match 'Add-RalphTrace' -and $goMd -match 'trace\.jsonl') "go skill records execution events to trace.jsonl"
@@ -534,8 +534,8 @@ if (Test-Path $ralphLib) { . $ralphLib }
 
 $rp1 = New-TempProject
 Set-RalphCurrentTask -Root $rp1 -TaskId '2026-06-16-foo'
-$ctPath = Join-Path $rp1 'superharness\ralph\.current-task'
-Assert-True (Test-Path $ctPath) "Set-RalphCurrentTask writes superharness/ralph/.current-task"
+$ctPath = Join-Path $rp1 '.claude\superharness\ralph\.current-task'
+Assert-True (Test-Path $ctPath) "Set-RalphCurrentTask writes .claude/superharness/ralph/.current-task"
 Assert-True ((Get-RalphCurrentTask -Root $rp1) -eq '2026-06-16-foo') "Get-RalphCurrentTask round-trips the id"
 $ctLines1 = @((Get-Content $ctPath) | Where-Object { $_.Trim() -ne '' })
 Assert-True ($ctLines1.Count -eq 1) ".current-task holds exactly one non-empty line"
@@ -554,8 +554,8 @@ Initialize-RalphTasks -Root $rp2 -Tasks @(
     @{ id=2; name='ledger'; status='done' },
     @{ id=3; name='retry' }
 ) -SprintTotal 7
-$tjPath = Join-Path $rp2 'superharness\ralph\task.json'
-Assert-True (Test-Path $tjPath) "Initialize-RalphTasks writes superharness/ralph/task.json"
+$tjPath = Join-Path $rp2 '.claude\superharness\ralph\task.json'
+Assert-True (Test-Path $tjPath) "Initialize-RalphTasks writes .claude/superharness/ralph/task.json"
 $tjLines = @((Get-Content $tjPath) | Where-Object { $_.Trim() -ne '' })
 Assert-True ($tjLines.Count -eq 1) "task.json is a single minified line"
 $tj = Get-RalphTasks -Root $rp2
@@ -587,8 +587,8 @@ Remove-Item $rp2 -Recurse -Force -ErrorAction SilentlyContinue
 Write-Host "`n[17c] trace.jsonl is an append-only ledger"
 $rp3 = New-TempProject
 Add-RalphTrace -Root $rp3 -Phase 'implement' -Event 'implement:start' -Detail 'Dispatching subagent'
-$trPath = Join-Path $rp3 'superharness\ralph\trace.jsonl'
-Assert-True (Test-Path $trPath) "Add-RalphTrace creates superharness/ralph/trace.jsonl"
+$trPath = Join-Path $rp3 '.claude\superharness\ralph\trace.jsonl'
+Assert-True (Test-Path $trPath) "Add-RalphTrace creates .claude/superharness/ralph/trace.jsonl"
 $firstBytes = [IO.File]::ReadAllText($trPath)
 Add-RalphTrace -Root $rp3 -Phase 'implement' -Event 'implement:done' -Detail 'Green'
 $allLines = @((Get-Content $trPath) | Where-Object { $_.Trim() -ne '' })
@@ -609,7 +609,7 @@ $st0 = Get-RalphRetryState -Root $rp4
 Assert-True ($st0.retries -eq 0 -and $st0.max -eq 5) "defaults to retries=0, max=5 when absent"
 Assert-True (-not (Test-RalphRetryExhausted -Root $rp4)) "not exhausted at 0 retries"
 1..5 | ForEach-Object { Add-RalphRetry -Root $rp4 | Out-Null }
-$rsPath = Join-Path $rp4 'superharness\ralph\.ralph-state.json'
+$rsPath = Join-Path $rp4 '.claude\superharness\ralph\.ralph-state.json'
 Assert-True (Test-Path $rsPath) ".ralph-state.json is written"
 Assert-True ((Get-RalphRetryState -Root $rp4).retries -eq 5) "Add-RalphRetry increments and persists"
 Assert-True (Test-RalphRetryExhausted -Root $rp4) "exhausted at the cap of 5"
@@ -646,7 +646,7 @@ Remove-Item $rp5 -Recurse -Force -ErrorAction SilentlyContinue
 # ---------------------------------------------------------------- Test group 17f: README documents the mechanism
 Write-Host "`n[17f] README documents the ralph state mechanism"
 $readmeRalph = Get-Content (Join-Path $RepoRoot 'README.md') -Raw
-Assert-True ($readmeRalph -match 'superharness/ralph/') "README documents the superharness/ralph/ location"
+Assert-True ($readmeRalph -match '.claude/superharness/ralph/') "README documents the .claude/superharness/ralph/ location"
 Assert-True ($readmeRalph -match '\.current-task' -and $readmeRalph -match 'trace\.jsonl' -and $readmeRalph -match '\.ralph-state\.json') "README documents all four ralph files"
 Assert-True ($readmeRalph -match 'Get-RalphResumeContext') "README documents the cold-start resume context function"
 
