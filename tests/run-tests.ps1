@@ -406,6 +406,18 @@ Assert-True (-not (Test-Path (Join-Path $plugin 'skills\resume\SKILL.md'))) "res
 # dot-source ralph-lib so the test process can assert on ralph state
 . (Join-Path $plugin 'scripts\ralph-lib.ps1')
 
+# ---------------------------------------------------------------- Test group 11g: installer ignores ralph runtime state
+Write-Host "`n[11g] Installer ensures the target ignores superharness/ralph/ runtime state"
+$giPath = Join-Path $proj '.gitignore'
+Assert-True (Test-Path $giPath) "installer creates/updates .gitignore"
+$giTxt = if (Test-Path $giPath) { Get-Content $giPath -Raw } else { '' }
+Assert-True ($giTxt -match 'superharness/ralph/') ".gitignore ignores superharness/ralph/"
+# idempotent: a second install must not duplicate the entry
+Invoke-Installer -TargetDir $proj | Out-Null
+$giTxt2 = Get-Content $giPath -Raw
+$giCount = ([regex]::Matches($giTxt2, 'superharness/ralph/')).Count
+Assert-True ($giCount -eq 1) "ralph ignore entry is not duplicated on re-install"
+
 # ---------------------------------------------------------------- Test group 12: UserPromptSubmit behavior
 Write-Host "`n[12] user-prompt-submit.ps1 stashes the pending round under superharness/ralph/"
 $cwd12 = New-TempProject
