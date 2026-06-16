@@ -400,6 +400,10 @@ Assert-True ($null -ne $hk.hooks.Stop) "hooks.json registers a Stop hook"
 Assert-True (Test-Path (Join-Path $plugin 'hooks\user-prompt-submit.ps1')) "ships hooks/user-prompt-submit.ps1"
 Assert-True (Test-Path (Join-Path $plugin 'hooks\stop.ps1')) "ships hooks/stop.ps1"
 Assert-True (Test-Path (Join-Path $plugin 'scripts\ralph-lib.ps1')) "ships scripts/ralph-lib.ps1 for the hooks"
+# auto-trigger ships into every installed project (so other projects get it too)
+Assert-True ((Get-Content (Join-Path $plugin 'hooks\user-prompt-submit.ps1') -Raw) -match 'Start-RalphTask') "installed user-prompt-submit.ps1 auto-triggers ralph (Start-RalphTask)"
+Assert-True ((Get-Content (Join-Path $plugin 'scripts\ralph-lib.ps1') -Raw) -match 'function Get-RalphGoInvocation') "installed ralph-lib ships Get-RalphGoInvocation"
+Assert-True ((Get-Content (Join-Path $plugin 'scripts\ralph-lib.ps1') -Raw) -match 'function Start-RalphTask') "installed ralph-lib ships Start-RalphTask"
 Assert-True (-not (Test-Path (Join-Path $plugin 'hooks\trace-lib.ps1'))) "old hooks/trace-lib.ps1 is gone"
 Assert-True (-not (Test-Path (Join-Path $plugin 'skills\resume\SKILL.md'))) "resume skill is removed (auto-retry replaces manual resume)"
 
@@ -493,6 +497,7 @@ Assert-True ($goMd -match '(?i)auto(matic)?[- ]?retr' -and $goMd -match '5') "go
 Assert-True ($goMd -match '(?i)one active') "go skill documents one active go task per project"
 Assert-True ($goMd -notmatch 'superharness/trace') "go skill no longer references the old superharness/trace/ mechanism"
 Assert-True ($goMd -notmatch 'outcome\.json') "go skill no longer references outcome.json markers"
+Assert-True ($goMd -match 'Start-RalphTask') "go skill documents the Start-RalphTask fallback (guaranteed bootstrap if the hook did not fire)"
 Assert-True ($goMd -match 'using-git-worktrees') "go skill still delegates isolation to using-git-worktrees"
 Assert-True ($goMd -match 'subagent-driven-development') "go skill still delegates Phase 2 to subagent-driven-development"
 

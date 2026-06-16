@@ -50,9 +50,16 @@ worktree creation fails, work in place — never block. Everything after this
   `/superharness:go` prompt was submitted, the UserPromptSubmit hook bootstrapped the
   ralph state under `.claude/superharness/ralph/`: it ran `Set-RalphCurrentTask` to
   write the `.current-task` pointer (the single active-task marker), seeded an empty
-  `task.json`, and opened `trace.jsonl` with a `task:started` event. These files
-  already exist — do NOT recreate them. Dot-source
-  `.claude/superharness/plugins/superharness/scripts/ralph-lib.ps1` and **enrich**:
+  `task.json`, and opened `trace.jsonl` with a `task:started` event. Dot-source
+  `.claude/superharness/plugins/superharness/scripts/ralph-lib.ps1` first.
+  - **Fallback — guarantee the files exist.** Check `Get-RalphCurrentTask -Root <project>`.
+    If it returns `$null` the hook did NOT fire (a brand-new session is needed to register
+    hooks, or this runner skips UserPromptSubmit for slash commands). In that case
+    bootstrap it yourself NOW, as the very first action, so the runtime files appear under
+    `.claude/superharness/ralph/` regardless:
+    `Start-RalphTask -Root <project> -TaskId '<YYYY-MM-DD-slug>' -Goal '<goal>'`.
+    If it already returns a task id, the hook handled it — do not recreate.
+  - Then **enrich** the (now-present) state:
   - `Initialize-RalphTasks -Root <project> -Tasks @(<one entry per plan task>) -Phase 'plan' -SprintTotal <N>`
     — replace the empty list in `.claude/superharness/ralph/task.json` with the plan's
     task list (each `pending`).
