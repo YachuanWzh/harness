@@ -681,6 +681,35 @@ $gi7 = Get-RalphGoInvocation -Prompt '/superharness:go' -Now $fixedNow
 Assert-True ($null -ne $gi7 -and $gi7.Goal -eq '') "matches a bare invocation with empty goal"
 Assert-True ($gi7.Slug -eq '2026-06-16-task-100000') "bare invocation also falls back to a timestamped slug"
 
+# ---------------------------------------------------------------- Test group 21: UserPromptSubmit auto-triggers ralph on /superharness:go
+Write-Host "`n[21] user-prompt-submit.ps1 auto-bootstraps ralph when the prompt is a go invocation"
+$ups = Join-Path $plugin 'hooks\user-prompt-submit.ps1'
+
+# 21a. a go invocation auto-creates the ralph state at the new path
+$g21 = New-TempProject
+Invoke-HookJson $ups @{ cwd = $g21; session_id = 's'; prompt = '/superharness:go fix the widget' } | Out-Null
+$gdir21 = Join-Path $g21 '.claude\superharness\ralph'
+Assert-True (Test-Path (Join-Path $gdir21 '.current-task')) "go prompt creates .current-task automatically"
+Assert-True ((Get-RalphCurrentTask -Root $g21) -match '^\d{4}-\d{2}-\d{2}-fix-the-widget$') ".current-task slug derives from the goal"
+Assert-True (Test-Path (Join-Path $gdir21 'task.json')) "go prompt creates task.json automatically"
+$tail21 = @(Get-RalphTraceTail -Root $g21 -Count 1)
+Assert-True ($tail21.Count -eq 1 -and $tail21[0].event -eq 'task:started') "go prompt opens trace.jsonl with task:started"
+Assert-True ($tail21[0].detail -eq 'fix the widget') "task:started detail carries the goal"
+Assert-True (Test-Path (Join-Path $gdir21 '.pending-prompt.json')) "go prompt is still stashed as the pending round"
+
+# 21b. a normal prompt does NOT bootstrap a task
+$n21 = New-TempProject
+Invoke-HookJson $ups @{ cwd = $n21; session_id = 's'; prompt = 'what does this function do?' } | Out-Null
+Assert-True (-not (Test-Path (Join-Path $n21 '.claude\superharness\ralph\.current-task'))) "a normal prompt does not create .current-task"
+Assert-True (Test-Path (Join-Path $n21 '.claude\superharness\ralph\.pending-prompt.json')) "a normal prompt is still stashed as the pending round"
+
+# 21c. a second distinct go goal repoints .current-task and appends a new task:started
+Invoke-HookJson $ups @{ cwd = $g21; session_id = 's'; prompt = '/superharness:go add the export button' } | Out-Null
+Assert-True ((Get-RalphCurrentTask -Root $g21) -match 'add-the-export-button$') "a distinct go goal repoints .current-task"
+$started21 = @(Get-Content (Join-Path $gdir21 'trace.jsonl') | Where-Object { $_ -match 'task:started' })
+Assert-True ($started21.Count -eq 2) "each distinct go goal appends its own task:started"
+Remove-Item $g21, $n21 -Recurse -Force -ErrorAction SilentlyContinue
+
 # ---------------------------------------------------------------- Test group 20: Start-RalphTask bootstrap
 Write-Host "`n[20] Start-RalphTask seeds all runtime files for a new task"
 $rp20 = New-TempProject
