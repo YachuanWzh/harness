@@ -402,12 +402,12 @@ Assert-True (Test-Path (Join-Path $plugin 'hooks\trace-lib.ps1')) "ships hooks/t
 Assert-True (Test-Path (Join-Path $plugin 'hooks\user-prompt-submit.ps1')) "ships hooks/user-prompt-submit.ps1"
 
 # ---------------------------------------------------------------- Test group 12: UserPromptSubmit behavior
-Write-Host "`n[12] user-prompt-submit.ps1 stashes the pending round"
+Write-Host "`n[12] user-prompt-submit.ps1 stashes the pending round under superharness/ralph/"
 $cwd12 = New-TempProject
 $ex12 = Invoke-HookJson (Join-Path $plugin 'hooks\user-prompt-submit.ps1') @{ cwd = $cwd12; session_id = 's1'; prompt = 'hello world' }
 Assert-True ($ex12 -eq 0) "user-prompt-submit exits 0"
-$pf12 = Join-Path $cwd12 'superharness\trace\.state\pending-prompt.json'
-Assert-True (Test-Path $pf12) "writes .state/pending-prompt.json"
+$pf12 = Join-Path $cwd12 'superharness\ralph\.pending-prompt.json'
+Assert-True (Test-Path $pf12) "writes superharness/ralph/.pending-prompt.json"
 $pj12 = $null; try { $pj12 = Get-Content $pf12 -Raw | ConvertFrom-Json } catch {}
 Assert-True ($null -ne $pj12 -and $pj12.query -eq 'hello world') "pending-prompt captures the user query"
 Assert-True ($null -ne $pj12 -and $pj12.ts -match '^\d{4}-\d{2}-\d{2}T') "pending-prompt captures an ISO timestamp"

@@ -1,14 +1,15 @@
-# UserPromptSubmit hook: stash the pending round's user query + timestamp so
-# that "every round is recorded" holds unconditionally — independent of whether
-# Claude later writes an outcome marker. Always exits 0.
+# UserPromptSubmit hook: stash the pending round's user query + timestamp under
+# superharness/ralph/ so the Stop hook can record a round even if the go skill
+# wrote no execution event. Always exits 0.
 $ErrorActionPreference = 'SilentlyContinue'
-. (Join-Path $PSScriptRoot 'trace-lib.ps1')
+. (Join-Path $PSScriptRoot '..\scripts\ralph-lib.ps1')
 try {
-    $in = Read-HookInput
-    if (-not $in) { exit 0 }
+    $raw = [Console]::In.ReadToEnd()
+    if ([string]::IsNullOrWhiteSpace($raw)) { exit 0 }
+    $in = $raw | ConvertFrom-Json
     $cwd = $in.cwd
     if ([string]::IsNullOrWhiteSpace($cwd)) { exit 0 }
-    $pending = @{ ts = (Get-IsoTimestamp); query = [string]$in.prompt }
-    Write-MinifiedJson (Join-Path (Get-StateDir $cwd) 'pending-prompt.json') $pending
+    $pending = [ordered]@{ ts = (Get-RalphIso); query = [string]$in.prompt }
+    Write-RalphJson (Join-Path (Get-RalphDir $cwd) '.pending-prompt.json') $pending
 } catch { }
 exit 0
