@@ -160,6 +160,15 @@ foreach ($s in $coreSkills) {
 Assert-True (Test-Path (Join-Path $plugin 'skills\test-driven-development\testing-anti-patterns.md')) "includes TDD supporting file testing-anti-patterns.md"
 Assert-True (Test-Path (Join-Path $plugin 'skills\requesting-code-review\code-reviewer.md')) "includes code-reviewer.md template referenced by requesting-code-review"
 
+# plans/specs live under .claude/superharness/, never a new top-level superharness/ folder
+$wpDoc = Get-Content (Join-Path $plugin 'skills\writing-plans\SKILL.md') -Raw
+Assert-True ($wpDoc -match '\.claude/superharness/plans/') "writing-plans saves plans under .claude/superharness/plans/"
+Assert-True ($wpDoc -notmatch '(?<!\.claude/)superharness/plans/') "writing-plans does not use a top-level superharness/plans/"
+$goDoc2 = Get-Content (Join-Path $plugin 'skills\go\SKILL.md') -Raw
+Assert-True ($goDoc2 -match '\.claude/superharness/plans/') "go skill saves plans under .claude/superharness/plans/"
+$harnessDoc2 = Get-Content (Join-Path $plugin 'HARNESS.md') -Raw
+Assert-True ($harnessDoc2 -match '\.claude/superharness/plans/') "HARNESS.md points plans at .claude/superharness/plans/"
+
 # brainstorm skill: present, manual-only, documents the message protocol
 $bsSkillPath = Join-Path $plugin 'skills\brainstorm\SKILL.md'
 Assert-True (Test-Path $bsSkillPath) "includes brainstorm skill (/superharness:brainstorm)"
@@ -168,6 +177,7 @@ Assert-True ($bs -match 'disable-model-invocation:\s*true') "brainstorm skill is
 Assert-True ($bs -match 'mindmap:snapshot') "brainstorm skill documents the mindmap:snapshot format"
 Assert-True ($bs -match 'node:click') "brainstorm skill documents the node:click event format"
 Assert-True ($bs -match 'start-server\.ps1') "brainstorm skill references start-server.ps1"
+Assert-True ($bs -match '\.claude/superharness/specs/') "brainstorm saves the design under .claude/superharness/specs/"
 foreach ($f in @('server.cjs','mindmap.html','layout.js','start-server.ps1','stop-server.ps1')) {
     Assert-True (Test-Path (Join-Path $plugin "skills\brainstorm\scripts\$f")) "includes brainstorm script: $f"
 }
@@ -263,7 +273,7 @@ if (-not $nodeCmd) {
     Assert-True $infoOk "start-server.ps1 prints server-info JSON"
     Assert-True ($info.url -match '^http://localhost:\d+$') "server-info has a localhost URL"
     $sessionDir = Split-Path -Parent $info.state_dir
-    Assert-True ($sessionDir -like (Join-Path $projS '.superharness\brainstorm\*')) "session dir lives under .superharness/brainstorm/"
+    Assert-True ($sessionDir -like (Join-Path $projS '.claude\superharness\brainstorm\*')) "session dir lives under .claude/superharness/brainstorm/"
 
     $httpOk = $false
     try { $resp = Invoke-WebRequest -Uri $info.url -UseBasicParsing -TimeoutSec 5; $httpOk = ($resp.StatusCode -eq 200) } catch {}
@@ -416,11 +426,14 @@ $giPath = Join-Path $proj '.gitignore'
 Assert-True (Test-Path $giPath) "installer creates/updates .gitignore"
 $giTxt = if (Test-Path $giPath) { Get-Content $giPath -Raw } else { '' }
 Assert-True ($giTxt -match '.claude/superharness/ralph/') ".gitignore ignores .claude/superharness/ralph/"
-# idempotent: a second install must not duplicate the entry
+Assert-True ($giTxt -match '.claude/superharness/brainstorm/') ".gitignore ignores .claude/superharness/brainstorm/"
+# idempotent: a second install must not duplicate the entries
 Invoke-Installer -TargetDir $proj | Out-Null
 $giTxt2 = Get-Content $giPath -Raw
 $giCount = ([regex]::Matches($giTxt2, '.claude/superharness/ralph/')).Count
 Assert-True ($giCount -eq 1) "ralph ignore entry is not duplicated on re-install"
+$giBsCount = ([regex]::Matches($giTxt2, '.claude/superharness/brainstorm/')).Count
+Assert-True ($giBsCount -eq 1) "brainstorm ignore entry is not duplicated on re-install"
 
 # ---------------------------------------------------------------- Test group 12: UserPromptSubmit behavior
 Write-Host "`n[12] user-prompt-submit.ps1 stashes the pending round under .claude/superharness/ralph/"

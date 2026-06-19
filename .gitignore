@@ -8,3 +8,5 @@ superharness/trace/.state/
 .claude/superharness/
 .claude/settings.json
 .claude/settings.local.json
+# superharness brainstorm mind-map session state (transient)
+.claude/superharness/brainstorm/

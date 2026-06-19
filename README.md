@@ -93,7 +93,7 @@ superharness --template=fullstack           :: 固定 React + Python（不接受
 
 1. **理解** —— 探索代码、确认目标，必要时一轮澄清
 2. **隔离** —— `using-git-worktrees`：git 项目默认建 worktree/分支隔离，非 git 则原地，绝不阻塞
-3. **计划** —— `writing-plans`：拆成 2-5 分钟的 TDD 小任务，存到 `superharness/plans/`
+3. **计划** —— `writing-plans`：拆成 2-5 分钟的 TDD 小任务，存到 `.claude/superharness/plans/`
 4. **实现** —— 多任务计划委托 `subagent-driven-development`（每任务派新子代理，主上下文只留计划与协调），琐碎/紧耦合任务主代理内联 `test-driven-development`；均严格红-绿-重构-提交，出问题转 `systematic-debugging`
 5. **验证** —— `verification-before-completion`：跑完整测试套件，贴出真实输出
 6. **审查** —— `requesting-code-review`：派子代理审查 diff，严重问题阻塞收尾
@@ -171,7 +171,7 @@ superharness --template=fullstack           :: 固定 React + Python（不接受
 **拖拽平移、滚轮缩放、双击复位**；节点按类型着色、按状态高亮（已选/淘汰/已定）；点击节点可
 把选择反馈给 Claude。**双击节点**可弹出编辑面板修改 `label`/`note`，保存后界面即时更新（乐观
 更新），点顶栏「提交」按钮把修改批量发回 Claude 并入设计。流程结束生成设计文档到
-`superharness/specs/`，并提示你可转 `/superharness:go` 实施。
+`.claude/superharness/specs/`，并提示你可转 `/superharness:go` 实施。
 
 消息协议（详见
 [设计文档](docs/superpowers/specs/2026-06-12-superharness-plugin-and-brainstorm-design.md)）：

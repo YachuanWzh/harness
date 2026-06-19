@@ -158,15 +158,21 @@ if (Test-Path $ClaudeMdPath) {
     [IO.File]::WriteAllText($ClaudeMdPath, $Section, $utf8)
 }
 
-# --- 5. Ensure the target ignores ralph runtime state (idempotent) ---
+# --- 5. Ensure the target ignores superharness runtime state (idempotent) ---
 $GitignorePath = Join-Path $TargetDir '.gitignore'
-$ignoreLine = '.claude/superharness/ralph/'
 $giExisting = if (Test-Path $GitignorePath) { [IO.File]::ReadAllText($GitignorePath, $utf8) } else { '' }
-if ($giExisting -notmatch [regex]::Escape($ignoreLine)) {
-    $prefix = if ($giExisting -and -not $giExisting.EndsWith("`n")) { "`r`n" } else { '' }
-    $block = "$prefix# superharness ralph runtime state (per-task tracking + retry)`r`n$ignoreLine`r`n"
-    [IO.File]::WriteAllText($GitignorePath, $giExisting + $block, $utf8)
+$ignoreLines = @(
+    @{ Comment = '# superharness ralph runtime state (per-task tracking + retry)'; Line = '.claude/superharness/ralph/' },
+    @{ Comment = '# superharness brainstorm mind-map session state (transient)';     Line = '.claude/superharness/brainstorm/' }
+)
+foreach ($entry in $ignoreLines) {
+    if ($giExisting -notmatch [regex]::Escape($entry.Line)) {
+        $prefix = if ($giExisting -and -not $giExisting.EndsWith("`n")) { "`r`n" } else { '' }
+        $block = "$prefix$($entry.Comment)`r`n$($entry.Line)`r`n"
+        $giExisting = $giExisting + $block
+    }
 }
+[IO.File]::WriteAllText($GitignorePath, $giExisting, $utf8)
 
 Write-Host ""
 Write-Host "Superharness installed into: $MarketDir" -ForegroundColor Green

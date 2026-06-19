@@ -1,5 +1,5 @@
 # Starts the brainstorm mind-map server for a project.
-# Creates <project>/.superharness/brainstorm/<session-id>/{content,state}, launches
+# Creates <project>/.claude/superharness/brainstorm/<session-id>/{content,state}, launches
 # node server.cjs detached, waits for state/server-info, prints it and exits.
 param(
     [string]$ProjectDir = (Get-Location).Path,
@@ -12,7 +12,7 @@ $node = Get-Command node -ErrorAction SilentlyContinue
 if (-not $node) { Write-Error 'node not found on PATH - brainstorm mind map unavailable'; exit 1 }
 
 $sessionId = (Get-Date -Format 'yyyyMMdd-HHmmss') + '-' + $PID
-$sessionDir = Join-Path $ProjectDir ".superharness\brainstorm\$sessionId"
+$sessionDir = Join-Path $ProjectDir ".claude\superharness\brainstorm\$sessionId"
 New-Item -ItemType Directory -Force (Join-Path $sessionDir 'content') | Out-Null
 New-Item -ItemType Directory -Force (Join-Path $sessionDir 'state') | Out-Null
 

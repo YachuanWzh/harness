@@ -31,7 +31,7 @@ The output of this skill is a design document, not code.
 
 2. Parse the printed JSON: save `url`, `content_dir`, `state_dir`, and the session
    directory (parent of `state_dir`). Tell the user to open `url` in a browser.
-3. Remind the user to add `.superharness/` to `.gitignore` if missing.
+3. Remind the user to add `.claude/superharness/brainstorm/` to `.gitignore` if missing.
 4. **Degrade gracefully:** if node is missing or the script fails, say so and continue
    the whole flow in the terminal only. Never block brainstorming on the mind map.
 
@@ -72,8 +72,8 @@ as `kind: "risk"`.
 After the user approves the design:
 
 1. Push a final snapshot with `status: "approved"`.
-2. Write the design to `superharness/specs/YYYY-MM-DD-<topic-slug>.md` in the project
-   root (create the folder if missing) and commit it.
+2. Write the design to `.claude/superharness/specs/YYYY-MM-DD-<topic-slug>.md`
+   (create the folder if missing) and commit it.
 3. Stop the server:
 
    ```

@@ -39,8 +39,8 @@ worktree creation fails, work in place — never block. Everything after this
 
 **REQUIRED SUB-SKILL:** `superharness:writing-plans`
 
-- For any goal needing 3+ steps, write the plan to `superharness/plans/YYYY-MM-DD-<slug>.md`
-  in the project root (create the folder if missing).
+- For any goal needing 3+ steps, write the plan to `.claude/superharness/plans/YYYY-MM-DD-<slug>.md`
+  (create the folder if missing).
 - Bite-sized tasks, 2–5 minutes each. Every code step shows the actual code.
   Every task follows the TDD step sequence: failing test → verify RED → minimal
   implementation → verify GREEN → commit.

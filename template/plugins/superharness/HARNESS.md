@@ -35,7 +35,7 @@ the Skill tool before doing anything else.**
 3. **Root cause over quick fix.** When something breaks, follow the 4-phase process in
    `superharness:systematic-debugging`. No "let me just try this" patches.
 4. **Plan before multi-step work.** Tasks with 3+ steps get a written plan
-   (`superharness:writing-plans`) saved to `superharness/plans/` in the project, with
+   (`superharness:writing-plans`) saved to `.claude/superharness/plans/` in the project, with
    bite-sized 2–5 minute TDD steps.
 5. **Review before declaring victory.** Significant changes get a code review pass
    (`superharness:requesting-code-review`); Critical issues block progress.
