@@ -157,6 +157,8 @@ marketplace at ``.claude/superharness`` (enabled in ``.claude/settings.json`` vi
 engineering work.
 
 - Run a task end-to-end: ``/superharness:go <task goal>``
+- Small focused change (lighter go, no worktree/plan-file/ralph overhead):
+  ``/superharness:light <task goal>``
 - Brainstorm with a live browser mind map (manual trigger only):
   ``/superharness:brainstorm <topic>``
 - Non-negotiable: strict TDD (failing test first), systematic debugging, and
@@ -250,6 +252,7 @@ Installed skills: $skillList
 
 Key capabilities:
 - **go** -- Drive a task end-to-end under strict TDD + verification + code review discipline.
+- **light** -- Lightweight mode for small focused tasks: TDD with exemptions, real-output verification, no worktree/plan-file/ralph overhead.
 - **brainstorm** -- Explore requirements with a live browser mind map (manual trigger only).
 - **test-driven-development** -- RED-GREEN-REFACTOR cycle. No production code without a failing test first.
 - **systematic-debugging** -- Root-cause tracing, defense-in-depth, no guess-and-patch.
@@ -315,6 +318,7 @@ if ($HasClaudeMarker) {
     Write-Host "  1. Start Claude Code in this project directory (trust workspace when asked)."
     Write-Host "  2. Plugin loads automatically from local marketplace .claude/superharness."
     Write-Host "  3. Run a task:  /superharness:go [task goal]"
+    Write-Host "     or a small focused change:  /superharness:light [task goal]"
     Write-Host "     or brainstorm:  /superharness:brainstorm [topic]"
 }
 
@@ -324,6 +328,7 @@ if ($HasFlavorMarker) {
     Write-Host "  1. Start flavor-code in this project directory:  flavor"
     Write-Host "  2. Plugin auto-loads from .flavor/plugins/superharness/ (skillRoot registered at startup)."
     Write-Host "  3. Run a task:  /go [task goal]"
+    Write-Host "     or a small focused change:  /light [task goal]"
     Write-Host "     or brainstorm:  /brainstorm [topic]"
 }
 

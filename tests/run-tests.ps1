@@ -138,13 +138,14 @@ $cm4 = Get-Content (Join-Path $proj4 'CLAUDE.md') -Raw
 Assert-True ($cm4 -match '\.claude/superharness') "CLAUDE.md section points to .claude/superharness"
 Assert-True ($cm4 -notmatch 'skills-dir') "CLAUDE.md section no longer mentions skills-dir"
 Assert-True ($cm4 -match 'superharness:brainstorm') "CLAUDE.md mentions /superharness:brainstorm"
+Assert-True ($cm4 -match 'superharness:light') "CLAUDE.md mentions /superharness:light"
 
 $harnessDoc = Get-Content (Join-Path (Get-PluginDir $proj4) 'HARNESS.md') -Raw
 Assert-True ($harnessDoc -notmatch 'skills-dir') "HARNESS.md no longer mentions skills-dir loading"
 Assert-True ($harnessDoc -match 'superharness:brainstorm') "HARNESS.md lists the brainstorm skill"
 
 $pj = Get-Content (Join-Path (Get-PluginDir $proj4) '.claude-plugin\plugin.json') -Raw | ConvertFrom-Json
-Assert-True ($pj.version -eq '2.0.0') "plugin.json version bumped to 2.0.0"
+Assert-True ($pj.version -eq '2.1.0') "plugin.json version bumped to 2.1.0"
 
 # ---------------------------------------------------------------- Test group 2: skills
 Write-Host "`n[2] Installer copies the go skill and the core engineering skills"
@@ -182,6 +183,22 @@ foreach ($f in @('server.cjs','mindmap.html','layout.js','start-server.ps1','sto
     Assert-True (Test-Path (Join-Path $plugin "skills\brainstorm\scripts\$f")) "includes brainstorm script: $f"
 }
 
+# light skill: present, keeps core discipline, drops the heavy machinery
+$lightPath = Join-Path $plugin 'skills\light\SKILL.md'
+Assert-True (Test-Path $lightPath) "includes light skill (/superharness:light)"
+$light = if (Test-Path $lightPath) { Get-Content $lightPath -Raw } else { '' }
+Assert-True ($light -match '\$ARGUMENTS') "light skill consumes the task goal via `$ARGUMENTS"
+Assert-True ($light -match 'RED|failing test') "light skill keeps the TDD red-green cycle"
+Assert-True ($light -match '(?i)exempt') "light skill defines explicit TDD exemptions"
+Assert-True ($light -match '(?i)work in place|原地') "light skill works in place by default (no forced worktree)"
+Assert-True ($light -match '(?i)verification-before-completion|real output|真实输出') "light skill keeps verification with real output"
+Assert-True ($light -match 'superharness:systematic-debugging') "light skill keeps root-cause debugging"
+Assert-True ($light -match 'superharness:go') "light skill points heavy tasks back to go"
+Assert-True ($light -notmatch '\.claude/superharness/plans/') "light skill does not write plan files"
+Assert-True ($light -notmatch '(?i)subagent') "light skill never dispatches subagents"
+Assert-True ($light -notmatch 'Start-RalphTask|Set-RalphCurrentTask|Add-RalphTrace|Initialize-RalphTasks') "light skill does not drive ralph tracking"
+Assert-True ($harnessDoc2 -match 'superharness:light') "HARNESS.md lists the light skill"
+
 # no dangling superpowers: references — copied skills must be patched to superharness:
 $dangling = @(Get-ChildItem (Join-Path $plugin 'skills') -Recurse -Filter *.md -ErrorAction SilentlyContinue |
     Where-Object { (Get-Content $_.FullName -Raw) -match 'superpowers:' })
@@ -209,6 +226,7 @@ $cm = if (Test-Path $claudeMd) { Get-Content $claudeMd -Raw } else { '' }
 Assert-True ($cm -match '<!-- SUPERHARNESS:BEGIN -->') "CLAUDE.md contains SUPERHARNESS:BEGIN marker"
 Assert-True ($cm -match '<!-- SUPERHARNESS:END -->') "CLAUDE.md contains SUPERHARNESS:END marker"
 Assert-True ($cm -match 'superharness:go') "CLAUDE.md mentions /superharness:go"
+Assert-True ($cm -match 'superharness:light') "CLAUDE.md mentions /superharness:light"
 
 # existing CLAUDE.md content is preserved
 $proj2 = New-TempProject
@@ -544,6 +562,7 @@ Assert-True ($goMd3 -match '(?i)Phase 0.5|Isolate') "go skill adds the Isolate p
 $harnessDoc2 = Get-Content (Join-Path $plugin 'HARNESS.md') -Raw
 Assert-True ($harnessDoc2 -match 'using-git-worktrees') "HARNESS.md lists using-git-worktrees"
 Assert-True ($harnessDoc2 -match 'subagent-driven-development') "HARNESS.md lists subagent-driven-development"
+Assert-True ($harnessDoc2 -match 'superharness:light') "HARNESS.md lists the light skill"
 
 # ---------------------------------------------------------------- Test group 17a: ralph-lib ships + .current-task
 Write-Host "`n[17a] ralph-lib.ps1 ships and .current-task round-trips a single line"

@@ -2,7 +2,8 @@
 
 给 Claude Code 的项目级工程纪律"线束"（harness）。一条命令初始化项目，之后在 Claude Code 中用
 `/superharness:go <任务目标>` 即可让 AI 在严格约束（TDD、系统化调试、完成前验证、代码审查）下
-自主完成开发任务；用 `/superharness:brainstorm <主题>` 在浏览器实时脑图里梳理需求与设计。
+自主完成开发任务；小改动可用轻量档 `/superharness:light <任务目标>`（保留核心纪律、砍掉重装备）；
+用 `/superharness:brainstorm <主题>` 在浏览器实时脑图里梳理需求与设计。
 
 加载方式：初始化时把插件安装为 **本地 marketplace**（`.claude/superharness`），并在
 `.claude/settings.json` 中通过 `extraKnownMarketplaces` + `enabledPlugins` 自动启用——
@@ -98,6 +99,26 @@ superharness --template=fullstack           :: 固定 React + Python（不接受
 5. **验证** —— `verification-before-completion`：跑完整测试套件，贴出真实输出
 6. **审查** —— `requesting-code-review`：派子代理审查 diff，严重问题阻塞收尾
 
+### 3.1 轻量任务（light）
+
+觉得 `go` 对当前任务太重？用轻量档：
+
+```
+/superharness:light 修一下登录页的按钮样式
+```
+
+`light` 保留核心纪律（TDD + 明确豁免、真实输出验证、根因调试），砍掉重装备：
+
+| go 的装备 | light 的处理 |
+|-----------|--------------|
+| worktree/分支隔离 | 默认原地工作，仅大改动才建一次性分支 |
+| 计划文件 `.claude/superharness/plans/` | 不写，任务清单用 TodoWrite 管理 |
+| 子代理实现 + 子代理审查 | 全部内联完成，收尾用自查清单 |
+| Ralph 跟踪（`.current-task` / `task.json` / `trace.jsonl`） | 不启动，零记账负担，中断重跑即可 |
+
+适用：小 bug 修复、小功能、配置/文案调整、原型验证。任务变大时它自己会建议切换回
+`/superharness:go`。注意：`light` 不接管、不结束已有的 go 任务（若 `.current-task` 存在会先提醒你）。
+
 ### 4. 任务过程跟踪与自动重试
 
 `go` 的任务跟踪**直接构建在下文的 Ralph 状态机制之上**（`.claude/superharness/ralph/`），不再使用旧的
@@ -191,6 +212,7 @@ superharness --template=fullstack           :: 固定 React + Python（不接受
 | 技能 | 来源 | 触发时机 |
 |------|------|----------|
 | `superharness:go` | 本项目 | 用户给出端到端任务目标（含 Ralph 跟踪与同一次运行内自动重试） |
+| `superharness:light` | 本项目 | 小任务/快速改动，go 的轻量档：豁免式 TDD + 真实输出验证，无 worktree/计划文件/子代理/Ralph 记账 |
 | `superharness:brainstorm` | 本项目（流程参考 superpowers） | **仅手动** `/superharness:brainstorm`，实时脑图梳理需求设计 |
 | `superharness:writing-plans` | superpowers（适配） | 多步任务动代码之前 |
 | `superharness:using-git-worktrees` | superpowers（适配） | 动代码前需要隔离工作区（go Phase 0.5） |
@@ -216,7 +238,7 @@ superharness\
 │       ├── hooks\user-prompt-submit.ps1  # 暂存每轮 query 到 .claude/superharness/ralph/.pending-prompt.json
 │       ├── hooks\stop.ps1                # 向 trace.jsonl 追加 round 心跳的钩子（基于 ralph-lib）
 │       ├── scripts\ralph-lib.ps1         # Ralph 状态库（go 跟踪 + 重试，钩子 dot-source 它）
-│       └── skills\...                    # go + brainstorm + using-git-worktrees + subagent-driven-development + 5 个核心技能
+│       └── skills\...                    # go + light + brainstorm + using-git-worktrees + subagent-driven-development + 5 个核心技能
 │           └── brainstorm\scripts\       # server.cjs / mindmap.html / layout.js / start|stop-server.ps1
 ├── tests\run-tests.ps1      # 安装器/钩子测试套件（PowerShell，TDD）
 ├── tests\*.test.mjs         # 脑图服务器与布局测试（node --test）

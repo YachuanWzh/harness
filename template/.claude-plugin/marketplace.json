@@ -5,7 +5,7 @@
     {
       "name": "superharness",
       "source": "./plugins/superharness",
-      "description": "Project-level autonomous engineering harness: TDD-first workflow, systematic debugging, planning, verification, and mind-map brainstorming."
+      "description": "Project-level autonomous engineering harness: TDD-first workflow, systematic debugging, planning, verification, and mind-map brainstorming. /superharness:go for end-to-end tasks, /superharness:light for small focused changes."
     }
   ]
 }

@@ -10,3 +10,4 @@ superharness/trace/.state/
 .claude/settings.local.json
 # superharness brainstorm mind-map session state (transient)
 .claude/superharness/brainstorm/
+.flavor
