@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"${CLAUDE_PLUGIN_ROOT}/hooks/session-start.ps1\""
+            "command": "node -e \"const{execFileSync}=require('child_process');const r=process.env.CLAUDE_PLUGIN_ROOT||'.';const win=process.platform==='win32';try{execFileSync(win?'powershell.exe':'bash',win?['-NoProfile','-ExecutionPolicy','Bypass','-File',r+'/hooks/session-start.ps1']:[r+'/hooks/session-start.sh'],{stdio:'inherit'})}catch(e){}process.exit(0)\""
           }
         ]
       }
@@ -16,7 +16,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"${CLAUDE_PLUGIN_ROOT}/hooks/user-prompt-submit.ps1\""
+            "command": "node -e \"const{execFileSync}=require('child_process');const r=process.env.CLAUDE_PLUGIN_ROOT||'.';const win=process.platform==='win32';try{execFileSync(win?'powershell.exe':'bash',win?['-NoProfile','-ExecutionPolicy','Bypass','-File',r+'/hooks/user-prompt-submit.ps1']:[r+'/hooks/user-prompt-submit.sh'],{stdio:'inherit'})}catch(e){}process.exit(0)\""
           }
         ]
       }
@@ -26,7 +26,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"${CLAUDE_PLUGIN_ROOT}/hooks/stop.ps1\""
+            "command": "node -e \"const{execFileSync}=require('child_process');const r=process.env.CLAUDE_PLUGIN_ROOT||'.';const win=process.platform==='win32';try{execFileSync(win?'powershell.exe':'bash',win?['-NoProfile','-ExecutionPolicy','Bypass','-File',r+'/hooks/stop.ps1']:[r+'/hooks/stop.sh'],{stdio:'inherit'})}catch(e){}process.exit(0)\""
           }
         ]
       }

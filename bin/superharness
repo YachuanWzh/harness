@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# Superharness CLI (macOS / Linux) - initializes superharness in the current
+# project directory. Counterpart of bin\superharness.cmd on Windows.
+set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+exec bash "$SCRIPT_DIR/../lib/install.sh" --target-dir "$(pwd)" "$@"

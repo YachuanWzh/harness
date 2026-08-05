@@ -223,6 +223,15 @@ if ($HasFlavorMarker) {
     Copy-Item -Path (Join-Path $PluginMetaSource 'flavor-plugin.json') -Destination $FlavorPluginDir -Force
     Copy-Item -Path (Join-Path $PluginMetaSource 'index.js')          -Destination $FlavorPluginDir -Force
 
+    # --- 2a'. Docs consumed by the plugin hooks (SessionStart injects HARNESS.md) ---
+    Copy-Item -Path (Join-Path $TemplateDir 'plugins\superharness\HARNESS.md') -Destination $FlavorPluginDir -Force
+    $FlavorStackTarget = Join-Path $FlavorPluginDir 'STACK.md'
+    if ($StackDocId) {
+        Copy-Item -Path (Join-Path $TemplateDir "plugins\superharness\stacks\$StackDocId.md") -Destination $FlavorStackTarget -Force
+    } elseif (Test-Path $FlavorStackTarget) {
+        Remove-Item $FlavorStackTarget -Force
+    }
+
     # --- 2b. Copy skills into .flavor/plugins/superharness/skills/ ---
     if (Test-Path $FlavorSkillsDest) { Remove-Item $FlavorSkillsDest -Recurse -Force }
     Copy-Item -Path $SkillsSource -Destination $FlavorSkillsDest -Recurse
@@ -246,7 +255,9 @@ $FlavorBeginMarker
 
 This project has **superharness** installed as a flavor-code plugin under
 ``.flavor/plugins/superharness/``. It registers a skill root that provides
-engineering-discipline skills for autonomous development.
+engineering-discipline skills for autonomous development, plus SessionStart /
+UserPromptSubmit / Stop hooks that inject ``HARNESS.md`` into every session and
+track ``/go`` tasks under ``.claude/superharness/ralph/``.
 
 Installed skills: $skillList
 
@@ -286,7 +297,8 @@ $FlavorEndMarker
     $GitignorePath = Join-Path $TargetDir '.gitignore'
     $giExisting = if (Test-Path $GitignorePath) { [IO.File]::ReadAllText($GitignorePath, $utf8) } else { '' }
     $flavorIgnoreLines = @(
-        @{ Comment = '# superharness brainstorm mind-map session state (transient)'; Line = '.superharness/' }
+        @{ Comment = '# superharness brainstorm mind-map session state (transient)'; Line = '.superharness/' },
+        @{ Comment = '# superharness ralph runtime state (per-task tracking + retry)'; Line = '.claude/superharness/ralph/' }
     )
     foreach ($entry in $flavorIgnoreLines) {
         if ($giExisting -notmatch [regex]::Escape($entry.Line)) {

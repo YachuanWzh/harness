@@ -1,13 +1,18 @@
 # Superharness
 
-给 Claude Code 的项目级工程纪律"线束"（harness）。一条命令初始化项目，之后在 Claude Code 中用
+给 Claude Code 与 flavor-code 的项目级工程纪律"线束"（harness）。一条命令初始化项目，之后在 Claude Code 中用
 `/superharness:go <任务目标>` 即可让 AI 在严格约束（TDD、系统化调试、完成前验证、代码审查）下
 自主完成开发任务；小改动可用轻量档 `/superharness:light <任务目标>`（保留核心纪律、砍掉重装备）；
-用 `/superharness:brainstorm <主题>` 在浏览器实时脑图里梳理需求与设计。
+用 `/superharness:brainstorm <主题>` 在浏览器实时脑图里梳理需求与设计。在 flavor-code 中技能无
+命名空间前缀，直接 `/go <任务目标>`、`/light`、`/brainstorm` 调用。
 
 加载方式：初始化时把插件安装为 **本地 marketplace**（`.claude/superharness`），并在
 `.claude/settings.json` 中通过 `extraKnownMarketplaces` + `enabledPlugins` 自动启用——
 信任项目目录后即获得 `/superharness:*` 命名空间技能与 SessionStart 钩子。
+flavor-code 项目（`FLAVOR.md` / `.flavor` 标记）则安装为 `.flavor/plugins/superharness/`
+原生插件，同时注册 SessionStart / UserPromptSubmit / Stop 钩子，行为与 Claude Code 侧对齐。
+
+支持 **Windows**（PowerShell）与 **macOS / Linux**（bash）双平台，两套实现功能等价。
 
 核心技能内容移植自 [obra/superpowers](https://github.com/obra/superpowers)（MIT License），
 并为自主工作流做了适配。
@@ -19,16 +24,23 @@
 
 ### 全局安装（推荐，一次性）
 
-把 superharness 安装到 `%LOCALAPPDATA%\superharness\`，之后在任何目录都能直接使用——删掉 clone 仓库也不影响：
+**Windows**：把 superharness 安装到 `%LOCALAPPDATA%\superharness\`，之后在任何目录都能直接使用——删掉 clone 仓库也不影响：
 
 ```cmd
 powershell -NoProfile -ExecutionPolicy Bypass -File install-global.ps1
 ```
 
+**macOS / Linux**：安装到 `~/.local/superharness/`，并按当前 shell（zsh/bash）自动把 `bin/` 写入对应 rc 文件的 PATH：
+
+```bash
+bash install-global.sh
+```
+
 打开**新终端**后，在任意项目目录执行 `superharness` 即可初始化。
 
-> 更新：拉取新版 clone 后重新运行上述命令覆盖即可。
-> 卸载：删除 `%LOCALAPPDATA%\superharness\`，并从用户环境变量 PATH 中移除对应的 `bin\` 路径。
+> 更新：拉取新版 clone 后重新运行上述命令覆盖即可（旧路径会自动清理）。
+> 卸载（Windows）：删除 `%LOCALAPPDATA%\superharness\`，并从用户环境变量 PATH 中移除对应的 `bin\` 路径。
+> 卸载（macOS / Linux）：删除 `~/.local/superharness/`，并从 shell rc 文件中移除对应的 `bin/` PATH 行。
 
 ### 本地 PATH（轻量替代）
 
@@ -38,25 +50,40 @@ powershell -NoProfile -ExecutionPolicy Bypass -File install-global.ps1
 setup.cmd
 ```
 
-> 缺点是 clone 仓库删掉后 `superharness` 命令会失效。切回全局安装只需再跑一次 `install-global.ps1`，旧路径会自动清理。
+macOS / Linux 等价做法：把 clone 仓库的 `bin/` 加入 PATH（如 `export PATH="$PWD/bin:$PATH"` 写入 rc 文件）。
+
+> 缺点是 clone 仓库删掉后 `superharness` 命令会失效。切回全局安装只需再跑一次 `install-global.ps1`（或 `install-global.sh`），旧路径会自动清理。
 
 ## 使用方法
 
 ### 1. 初始化项目
 
-安装完成后，在任意项目根目录下（cmd 或 PowerShell 均可）：
+安装完成后，在任意项目根目录下（Windows 用 cmd/PowerShell，macOS/Linux 用终端）：
 
-```cmd
+```
 superharness
 ```
 
-这会创建：
+安装器自动检测项目类型（也可同时存在、同时安装）：
+
+- **Claude Code 项目**（存在 `CLAUDE.md` 或 `.claude/`）→ 安装为本地 marketplace 插件
+- **flavor-code 项目**（存在 `FLAVOR.md` 或 `.flavor/`）→ 安装为 `.flavor/plugins/superharness/` 原生插件
+
+Claude Code 侧会创建：
 
 | 产物 | 作用 |
 |------|------|
 | `.claude\superharness\` | 本地 marketplace 目录（`.claude-plugin\marketplace.json` + `plugins\superharness\` 插件本体，含全部技能） |
 | `.claude\settings.json` 中的 `extraKnownMarketplaces` + `enabledPlugins` | 自动注册并启用该 marketplace 的插件（保留性合并，不破坏已有配置） |
 | `CLAUDE.md` 中的 SUPERHARNESS 标记段 | Claude Code 自动读取的兜底指引（已有内容会被保留，重复执行不会重复追加） |
+
+flavor-code 侧会创建：
+
+| 产物 | 作用 |
+|------|------|
+| `.flavor/plugins/superharness/` | 插件本体：`flavor-plugin.json`（清单，声明三个钩子）+ `index.js`（注册 skillRoot 与钩子）+ `skills/` + `HARNESS.md` |
+| `FLAVOR.md` 中的 SUPERHARNESS 标记段 | flavor-code 自动读取的兜底指引（同样保留性合并、幂等） |
+| 目标项目 `.gitignore` | 追加运行时态目录（`.claude/superharness/ralph/` 等） |
 
 #### 技术栈模板（可选）
 
@@ -75,13 +102,14 @@ superharness --template=fullstack           :: 固定 React + Python（不接受
 `plugins\superharness\stacks\*.md`，选中的一份会被写入 `.claude\superharness\STACK.md`；
 不带 `--template` 的普通初始化不写该文件（已有的会被移除）。
 
-### 2. 启动 Claude Code
+### 2. 启动 Claude Code / flavor-code
 
-在该项目目录运行 `claude`（首次需在信任弹窗中信任工作区）。此后：
+在该项目目录运行 `claude`（或 flavor-code 的 `flavor`；首次需在信任弹窗中信任工作区）。此后：
 
-- 插件经 `.claude/superharness` 本地 marketplace 自动加载 —— 无需任何安装命令；
-- 插件的 **SessionStart 钩子**自动把 `HARNESS.md`（约束规则）注入每个会话上下文；
-- 各技能以 `/superharness:*` 命名空间注册。`go` 等会按 description 自动触发；
+- Claude Code：插件经 `.claude/superharness` 本地 marketplace 自动加载 —— 无需任何安装命令；
+- flavor-code：插件经 `.flavor/plugins/superharness/` 自动加载，启动时注册 skillRoot 与三个钩子；
+- 两侧的 **SessionStart 钩子**都会自动把 `HARNESS.md`（约束规则）注入每个会话上下文；
+- 各技能以 `/superharness:*` 命名空间注册（flavor-code 侧无前缀，直接 `/go` 等）。`go` 等会按 description 自动触发；
   `brainstorm` 设了 `disable-model-invocation`，仅在你手动运行时启动。
 
 ### 3. 执行任务
@@ -126,7 +154,7 @@ superharness --template=fullstack           :: 固定 React + Python（不接受
 
 跟踪采用**混合式**，既可靠又有细粒度：
 
-- **UserPromptSubmit 钩子自动起跑**：用户一提交 `/superharness:go <目标>`,钩子就识别出这是
+- **UserPromptSubmit 钩子自动起跑**：用户一提交 `/superharness:go <目标>`（flavor-code 侧为 `/go <目标>`）,钩子就识别出这是
   go 调用,自动 `Start-RalphTask` —— 写 `.current-task`(slug 由目标派生)、播下空的 `task.json`、
   并向 `trace.jsonl` 追加 `task:started`。**四个运行时文件在任务一开始就自动出现,无需主代理手动 bootstrap。**
   换一个新目标会自动重指到新任务;重复提交同一任务则空操作。
@@ -149,8 +177,9 @@ superharness --template=fullstack           :: 固定 React + Python（不接受
 
 ### 5. Ralph 状态机制（可续跑的自治任务循环）
 
-为支持"原 agent 中断、新 agent 冷启动续跑"，提供一套零依赖的 PowerShell 状态库
-`scripts/ralph-lib.ps1`（dot-source 即用），管理 `<项目>/.claude/superharness/ralph/` 下四个运行时文件：
+为支持"原 agent 中断、新 agent 冷启动续跑"，提供一套零依赖的状态库，双平台实现：
+Windows 侧 `scripts/ralph-lib.ps1`（dot-source 即用），macOS/Linux 侧 `scripts/ralph-lib.sh`
+（source 即用，JSON 处理优先用 node、缺失时 python3 兜底），管理 `<项目>/.claude/superharness/ralph/` 下四个运行时文件：
 
 | 文件 | 作用 | 写入规则 |
 |------|------|----------|
@@ -159,7 +188,7 @@ superharness --template=fullstack           :: 固定 React + Python（不接受
 | `trace.jsonl` | 流水账，每行一条 `{ts,phase,event,detail}` | **只追加**，从不改写前面的行——崩溃最多坏最后一行，可逐行倒查 |
 | `.ralph-state.json` | 重试计数器 `{retries,max,updated_at}` | 原子覆盖，上限 **5** 次封顶 |
 
-库函数一览：
+库函数一览（PowerShell 命名；bash 版为对应的 snake_case 函数，如 `ralph_add_trace`、`ralph_get_resume_context`）：
 
 - `.current-task`：`Set-RalphCurrentTask` / `Get-RalphCurrentTask`
 - `task.json`：`Initialize-RalphTasks` / `Get-RalphTasks` / `Get-RalphNextTask`（取第一个未完成的子任务，跳过 `done`）/ `Set-RalphTaskStatus`（幂等改单个子任务状态）
@@ -226,23 +255,29 @@ superharness --template=fullstack           :: 固定 React + Python（不接受
 
 ```
 superharness\
-├── bin\superharness.cmd     # CLI 入口（PATH 上可直接调用）
-├── lib\install.ps1          # 安装器逻辑（可测试）
+├── bin\superharness.cmd     # Windows CLI 入口（PATH 上可直接调用）
+├── bin\superharness         # macOS/Linux CLI 入口（bash）
+├── lib\install.ps1          # Windows 安装器逻辑（可测试）
+├── lib\install.sh           # macOS/Linux 安装器（功能等价，bash）
 ├── template\                # 被复制进项目的 .claude/superharness（本地 marketplace）
 │   ├── .claude-plugin\marketplace.json   # marketplace 目录文件
 │   └── plugins\superharness\             # 插件本体
 │       ├── .claude-plugin\plugin.json    # 插件清单（提供 superharness: 命名空间）
 │       ├── HARNESS.md                    # 会话启动时注入的约束规则
-│       ├── hooks\hooks.json              # SessionStart + UserPromptSubmit + Stop 钩子注册
-│       ├── hooks\session-start.ps1       # 注入 HARNESS.md 的脚本
-│       ├── hooks\user-prompt-submit.ps1  # 暂存每轮 query 到 .claude/superharness/ralph/.pending-prompt.json
-│       ├── hooks\stop.ps1                # 向 trace.jsonl 追加 round 心跳的钩子（基于 ralph-lib）
-│       ├── scripts\ralph-lib.ps1         # Ralph 状态库（go 跟踪 + 重试，钩子 dot-source 它）
+│       ├── hooks\hooks.json              # SessionStart + UserPromptSubmit + Stop 钩子注册（node 内联调度器按平台选 .ps1/.sh）
+│       ├── hooks\session-start.ps1|.sh   # 注入 HARNESS.md 的钩子（双平台）
+│       ├── hooks\user-prompt-submit.ps1|.sh  # go 调用自动起跑 + 暂存每轮 query（双平台）
+│       ├── hooks\stop.ps1|.sh            # 向 trace.jsonl 追加 round 心跳的钩子（双平台）
+│       ├── plugin\flavor-plugin.json     # flavor-code 插件清单（声明三个钩子）
+│       ├── plugin\index.js               # flavor-code 插件入口（registerHook + skillRoot）
+│       ├── scripts\ralph-lib.ps1|.sh     # Ralph 状态库（go 跟踪 + 重试，钩子引用它；双平台）
 │       └── skills\...                    # go + light + brainstorm + using-git-worktrees + subagent-driven-development + 5 个核心技能
 │           └── brainstorm\scripts\       # server.cjs / mindmap.html / layout.js / start|stop-server.ps1
 ├── tests\run-tests.ps1      # 安装器/钩子测试套件（PowerShell，TDD）
-├── tests\*.test.mjs         # 脑图服务器与布局测试（node --test）
-├── setup.cmd / setup.ps1    # PATH 一次性配置
+├── tests\*.test.mjs         # 脑图服务器、布局与 flavor 插件钩子测试（node --test）
+├── setup.cmd / setup.ps1    # Windows PATH 一次性配置
+├── install-global.ps1       # Windows 全局安装器
+├── install-global.sh        # macOS/Linux 全局安装器（安装到 ~/.local/superharness）
 └── README.md
 ```
 
@@ -251,10 +286,10 @@ superharness\
 本项目自身按 TDD 构建，两套测试：
 
 ```cmd
-:: 安装器 + 钩子（PowerShell，零依赖）
+:: 安装器 + 钩子（PowerShell，零依赖，Windows 侧）
 powershell -NoProfile -ExecutionPolicy Bypass -File tests\run-tests.ps1
 
-:: 脑图服务器 + 布局纯函数（需 Node ≥ 18，24 个用例）
+:: 脑图服务器 + 布局纯函数 + flavor 插件钩子（需 Node ≥ 18，跨平台）
 node --test tests\
 ```
 
@@ -265,7 +300,9 @@ PowerShell 套件覆盖：安装产物完整性、marketplace.json/plugin.json/h
 go 技能驱动 Ralph 跟踪与自动重试、安装器把 `.claude/superharness/ralph/` 写入目标 `.gitignore`、Ralph 状态库行为。
 Node 套件覆盖：脑图树布局（确定性、无重叠、左右分布）、服务器 HTTP 端点与 server-info、
 事件落盘、WebSocket 快照推送与文件监听、空闲自动退出、节点编辑协议（node:edit/submit 分流
-至 state/edits、乐观更新清空时机、编辑面板 UI 就位）。
+至 state/edits、乐观更新清空时机、编辑面板 UI 就位）、flavor 插件钩子（模拟 flavor-code
+HookBus 驱动 `index.js`：清单声明与注册一致性、SessionStart 注入 HARNESS.md/STACK.md、
+UserPromptSubmit 对 `/go` 自动 bootstrap ralph 状态、Stop 心跳与非法事件容错）。
 
 修改 `template\` 后无需重新安装本仓库——下次在项目里运行 `superharness` 即覆盖更新（安装器会
 把插件 `version` 写为当前模板版本，确保 Claude Code 重新拉取缓存）；已初始化项目中改动插件文件后，
@@ -273,6 +310,6 @@ Node 套件覆盖：脑图树布局（确定性、无重叠、左右分布）、
 
 ## 环境要求
 
-- Windows（安装器与钩子为 PowerShell 实现）
-- Node ≥ 18（仅 `/superharness:brainstorm` 脑图服务器需要；其余功能不依赖 Node）
-- Claude Code ≥ 2.1.x（本地 marketplace 插件机制；本机验证版本 2.1.173）
+- **Windows**（安装器与钩子为 PowerShell 实现）或 **macOS / Linux**（bash 实现；钩子 JSON 处理优先用 node，缺失时 python3 兜底）
+- Node ≥ 18（`/superharness:brainstorm` 脑图服务器需要；bash 侧钩子 JSON 处理优先用它；其余功能不依赖）
+- Claude Code ≥ 2.1.x（本地 marketplace 插件机制；本机验证版本 2.1.173）；或 flavor-code（插件系统：`flavor-plugin.json` + `registerHook` API）
