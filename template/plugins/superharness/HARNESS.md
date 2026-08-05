@@ -1,8 +1,11 @@
 # Superharness Bootstrap
 
 You have superharness: a project-level engineering discipline harness. It is loaded
-as a Claude Code plugin from the local marketplace at `.claude/superharness` and this
-document is injected at session start by its SessionStart hook.
+as a plugin of your host — from the local marketplace at `.claude/superharness`
+under Claude Code, or as a native plugin under `.flavor/plugins/superharness`
+under flavor-code — and this document is injected at session start by its
+SessionStart hook. The state root follows the host: `.claude/superharness/`
+under Claude Code, `.flavor/superharness/` under flavor-code.
 
 ## The Rule
 
@@ -36,8 +39,8 @@ the Skill tool before doing anything else.**
 3. **Root cause over quick fix.** When something breaks, follow the 4-phase process in
    `superharness:systematic-debugging`. No "let me just try this" patches.
 4. **Plan before multi-step work.** Tasks with 3+ steps get a written plan
-   (`superharness:writing-plans`) saved to `.claude/superharness/plans/` in the project, with
-   bite-sized 2–5 minute TDD steps.
+   (`superharness:writing-plans`) saved to `<state-root>/superharness/plans/` in the
+   project, with bite-sized 2–5 minute TDD steps.
 5. **Review before declaring victory.** Significant changes get a code review pass
    (`superharness:requesting-code-review`); Critical issues block progress.
 
