@@ -3,7 +3,9 @@
 # Counterpart of scripts/ralph-lib.ps1.
 #
 # Manages the four runtime files of a resumable autonomous-task loop, all under
-# <project>/.claude/superharness/ralph/ :
+# <project>/<state-root>/superharness/ralph/ where <state-root> follows the host:
+#   .claude  (Claude Code install: .claude/superharness marketplace)
+#   .flavor  (flavor-code install: .flavor/plugins/superharness)
 #   .current-task      one-line pointer to the active task (switch = rewrite the line)
 #   task.json          task-list snapshot {status,phase,sprint,tasks[],updated_at}
 #   trace.jsonl        append-only ledger, one {ts,phase,event,detail} JSON per line
@@ -107,7 +109,23 @@ ralph_cleanup_hook_stdin() {
     rm -f "${RALPH_HOOK_CWD_FILE:-}" "${RALPH_HOOK_PROMPT_FILE:-}" 2>/dev/null || true
 }
 
-ralph_dir() { printf '%s/.claude/superharness/ralph' "$1"; }
+ralph_state_root() {
+    # Host detection: this library ships inside the host install, so its own path
+    # names the state root. SUPERHARNESS_STATE_ROOT ('.claude' | '.flavor') forces
+    # a choice for unusual layouts; Claude Code is the historical default.
+    case "${SUPERHARNESS_STATE_ROOT:-}" in
+        .flavor|flavor) printf '%s' '.flavor'; return ;;
+        .claude|claude) printf '%s' '.claude'; return ;;
+    esac
+    local self="${BASH_SOURCE[0]:-$0}" dir
+    dir="$(cd "$(dirname "$self")" 2>/dev/null && pwd)" || dir=""
+    case "$dir" in
+        */.flavor/plugins/superharness/scripts) printf '%s' '.flavor' ;;
+        *) printf '%s' '.claude' ;;
+    esac
+}
+
+ralph_dir() { printf '%s/%s/superharness/ralph' "$1" "$(ralph_state_root)"; }
 
 ralph_iso() { date -u '+%Y-%m-%dT%H:%M:%S+00:00'; }
 

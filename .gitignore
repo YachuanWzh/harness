@@ -11,3 +11,5 @@ superharness/trace/.state/
 # superharness brainstorm mind-map session state (transient)
 .claude/superharness/brainstorm/
 .flavor
+# superharness ralph runtime state (per-task tracking + retry)
+.flavor/superharness/ralph/

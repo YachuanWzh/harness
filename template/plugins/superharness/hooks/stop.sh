@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Stop hook (macOS / Linux). Counterpart of stop.ps1.
-# When a go task is active (.claude/superharness/ralph/.current-task present),
+# When a go task is active (ralph state root: .claude/superharness/ralph under
+# Claude Code, .flavor/superharness/ralph under flavor-code; .current-task present),
 # append a 'round' heartbeat to trace.jsonl so every user-facing round is recorded
 # even if the go skill wrote no execution event this round. No-op otherwise.
 # Always exits 0.

@@ -81,9 +81,9 @@ flavor-code 侧会创建：
 
 | 产物 | 作用 |
 |------|------|
-| `.flavor/plugins/superharness/` | 插件本体：`flavor-plugin.json`（清单，声明三个钩子）+ `index.js`（注册 skillRoot 与钩子）+ `skills/` + `HARNESS.md` |
+| `.flavor/plugins/superharness/` | 插件本体：`flavor-plugin.json`（清单，声明三个钩子）+ `index.js`（注册 skillRoot 与钩子）+ `skills/` + `scripts/ralph-lib.*` + `HARNESS.md` |
 | `FLAVOR.md` 中的 SUPERHARNESS 标记段 | flavor-code 自动读取的兜底指引（同样保留性合并、幂等） |
-| 目标项目 `.gitignore` | 追加运行时态目录（`.claude/superharness/ralph/` 等） |
+| 目标项目 `.gitignore` | 追加运行时态目录（flavor-code 侧为 `.flavor/superharness/ralph/`，Claude Code 侧为 `.claude/superharness/ralph/` 等） |
 
 #### 技术栈模板（可选）
 
@@ -149,7 +149,8 @@ superharness --template=fullstack           :: 固定 React + Python（不接受
 
 ### 4. 任务过程跟踪与自动重试
 
-`go` 的任务跟踪**直接构建在下文的 Ralph 状态机制之上**（`.claude/superharness/ralph/`），不再使用旧的
+`go` 的任务跟踪**直接构建在下文的 Ralph 状态机制之上**（Claude Code 为 `.claude/superharness/ralph/`，
+flavor-code 为 `.flavor/superharness/ralph/`，下文统称 ralph 状态目录），不再使用旧的
 `superharness/trace/<slug>.json` + `outcome.json` 机制，也不再需要手动的 `resume` 技能。
 
 跟踪采用**混合式**，既可靠又有细粒度：
@@ -179,7 +180,10 @@ superharness --template=fullstack           :: 固定 React + Python（不接受
 
 为支持"原 agent 中断、新 agent 冷启动续跑"，提供一套零依赖的状态库，双平台实现：
 Windows 侧 `scripts/ralph-lib.ps1`（dot-source 即用），macOS/Linux 侧 `scripts/ralph-lib.sh`
-（source 即用，JSON 处理优先用 node、缺失时 python3 兜底），管理 `<项目>/.claude/superharness/ralph/` 下四个运行时文件：
+（source 即用，JSON 处理优先用 node、缺失时 python3 兜底）。状态目录跟随宿主：Claude Code 安装在
+`<项目>/.claude/superharness/`，运行时文件落在 `.claude/superharness/ralph/`；flavor-code 安装在
+`<项目>/.flavor/plugins/superharness/`，运行时文件落在 `.flavor/superharness/ralph/`（ralph-lib 按自身安装位置自动识别，
+也可用环境变量 `SUPERHARNESS_STATE_ROOT` 强制指定）。管理该目录下四个运行时文件：
 
 | 文件 | 作用 | 写入规则 |
 |------|------|----------|
@@ -208,7 +212,8 @@ Windows 侧 `scripts/ralph-lib.ps1`（dot-source 即用），macOS/Linux 侧 `sc
 
 前 1～3 步与重试状态由 `Get-RalphResumeContext` 一次性装配成结构化事实；第 4～5 步的"对账/以代码为准"
 是 agent 的判断（跑 `git diff` 后用 `Set-RalphTaskStatus` 修正）。`task.json` 是"现在长啥样"的快照，
-`trace.jsonl` 是"怎么变成这样的"，二者互补。运行时文件位于 `.claude/superharness/ralph/`（已加入 `.gitignore`）。
+`trace.jsonl` 是"怎么变成这样的"，二者互补。运行时文件位于 ralph 状态目录（Claude Code 为
+`.claude/superharness/ralph/`，flavor-code 为 `.flavor/superharness/ralph/`；已加入 `.gitignore`）。
 
 ### 6. 脑图脑暴（手动触发）
 

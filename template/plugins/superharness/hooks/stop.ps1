@@ -1,4 +1,5 @@
-# Stop hook: when a go task is active (.claude/superharness/ralph/.current-task present),
+# Stop hook: when a go task is active (ralph state root: .claude/superharness/ralph under
+# Claude Code, .flavor/superharness/ralph under flavor-code; .current-task present),
 # append a 'round' heartbeat to trace.jsonl so every user-facing round is recorded
 # even if the go skill wrote no execution event this round. No-op otherwise.
 # Always exits 0.

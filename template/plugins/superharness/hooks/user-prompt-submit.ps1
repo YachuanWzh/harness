@@ -1,9 +1,10 @@
 # UserPromptSubmit hook. Two jobs, both best-effort (always exits 0):
 #  1. Auto-trigger ralph tracking: if the submitted prompt is a `/superharness:go`
 #     invocation, bootstrap the ralph state (.current-task + task.json + trace.jsonl)
-#     under .claude/superharness/ralph/ so the files appear automatically the moment
-#     a go task starts — no agent-run bootstrap required. A distinct go goal repoints
-#     to a new task; re-submitting the same task is a no-op.
+#     under the ralph state root (.claude/superharness/ralph/ under Claude Code,
+#     .flavor/superharness/ralph/ under flavor-code) so the files appear automatically
+#     the moment a go task starts — no agent-run bootstrap required. A distinct go goal
+#     repoints to a new task; re-submitting the same task is a no-op.
 #  2. Stash the pending round's user query + timestamp so the Stop hook can record a
 #     `round` heartbeat even if the go skill wrote no execution event this round.
 $ErrorActionPreference = 'SilentlyContinue'

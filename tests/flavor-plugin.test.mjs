@@ -155,7 +155,7 @@ test('UserPromptSubmit auto-bootstraps ralph state on a /go invocation (workspac
     const decision = await submit({ version: 1, type: 'UserPromptSubmit', payload: { prompt: '/go fix the widget' } }, signal);
     assertHookDecision(decision);
     assert.equal(decision.decision, 'allow');
-    const ralph = path.join(workspace, '.claude', 'superharness', 'ralph');
+    const ralph = path.join(workspace, '.flavor', 'superharness', 'ralph');
     assert.ok(fs.existsSync(path.join(ralph, '.current-task')), '.current-task created');
     assert.match(fs.readFileSync(path.join(ralph, '.current-task'), 'utf8'), /^\d{4}-\d{2}-\d{2}-fix-the-widget$/);
     assert.ok(fs.existsSync(path.join(ralph, 'task.json')), 'task.json created');
@@ -190,7 +190,7 @@ test('Stop without an active task is a no-op allow; hooks never throw on malform
     const stop = host.registered.hook.get('Stop').handler;
     const decision = await stop({ version: 1, type: 'Stop', payload: {} }, signal);
     assertHookDecision(decision);
-    assert.ok(!fs.existsSync(path.join(workspace, '.claude', 'superharness', 'ralph', 'trace.jsonl')),
+    assert.ok(!fs.existsSync(path.join(workspace, '.flavor', 'superharness', 'ralph', 'trace.jsonl')),
       'no trace without an active task');
 
     // malformed events must not throw (guards return allow)

@@ -28,7 +28,7 @@ If the goal above is empty, ask your human partner for the task goal and stop.
 - No subagent dispatch for implementation or review — everything is done inline in the current session, closed out with a self-check list
 - No ralph tracking — no `.current-task` / `task.json` / `trace.jsonl` are written, the Stop hook automatically no-ops, zero bookkeeping overhead; if interrupted, just re-run
 
-> Note: if the project already has an active go task (`.claude/superharness/ralph/.current-task` exists), tell the user first — light will not take over or finish that task. Recommend closing out the go task before running light, to avoid the two flows crossing.
+> Note: if the project already has an active go task (`.claude/superharness/ralph/.current-task` exists — `.flavor/superharness/ralph/.current-task` under flavor-code), tell the user first — light will not take over or finish that task. Recommend closing out the go task before running light, to avoid the two flows crossing.
 
 ## Phase 1 — Understand
 

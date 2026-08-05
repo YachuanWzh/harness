@@ -259,6 +259,12 @@ if [ "$HAS_FLAVOR" = "1" ]; then
     rm -rf "$FLAVOR_SKILLS_DEST"
     cp -R "$SKILLS_SOURCE" "$FLAVOR_SKILLS_DEST"
 
+    # --- 2b'. Ralph state library — skills (go) source it to drive task tracking;
+    #          its install path under .flavor/ selects the .flavor state root ---
+    mkdir -p "$FLAVOR_PLUGIN_DIR/scripts"
+    cp -f "$TEMPLATE_DIR/plugins/superharness/scripts/ralph-lib.ps1" "$FLAVOR_PLUGIN_DIR/scripts/"
+    cp -f "$TEMPLATE_DIR/plugins/superharness/scripts/ralph-lib.sh" "$FLAVOR_PLUGIN_DIR/scripts/"
+
     COPIED_SKILLS=""
     for d in "$FLAVOR_SKILLS_DEST"/*/; do
         [ -d "$d" ] || continue
@@ -277,7 +283,7 @@ This project has **superharness** installed as a flavor-code plugin under
 \`.flavor/plugins/superharness/\`. It registers a skill root that provides
 engineering-discipline skills for autonomous development, plus SessionStart /
 UserPromptSubmit / Stop hooks that inject \`HARNESS.md\` into every session and
-track \`/go\` tasks under \`.claude/superharness/ralph/\`.
+track \`/go\` tasks under \`.flavor/superharness/ralph/\`.
 
 Installed skills: $COPIED_SKILLS
 
@@ -305,7 +311,7 @@ Usage in flavor-code: \`/<skill-name> <args>\`, e.g. \`/go refactor login module
         '.superharness/'
     append_gitignore_entry "$TARGET_DIR/.gitignore" \
         '# superharness ralph runtime state (per-task tracking + retry)' \
-        '.claude/superharness/ralph/'
+        '.flavor/superharness/ralph/'
 
     echo "  flavor-code plugin installed to: $FLAVOR_PLUGIN_DIR"
     INSTALLED_ANYTHING=1

@@ -236,6 +236,13 @@ if ($HasFlavorMarker) {
     if (Test-Path $FlavorSkillsDest) { Remove-Item $FlavorSkillsDest -Recurse -Force }
     Copy-Item -Path $SkillsSource -Destination $FlavorSkillsDest -Recurse
 
+    # --- 2b'. Ralph state library — skills (go) dot-source it to drive task tracking;
+    #          its install path under .flavor/ selects the .flavor state root ---
+    $FlavorScriptsDest = Join-Path $FlavorPluginDir 'scripts'
+    New-Item -ItemType Directory -Force $FlavorScriptsDest | Out-Null
+    Copy-Item -Path (Join-Path $TemplateDir 'plugins\superharness\scripts\ralph-lib.ps1') -Destination $FlavorScriptsDest -Force
+    Copy-Item -Path (Join-Path $TemplateDir 'plugins\superharness\scripts\ralph-lib.sh')  -Destination $FlavorScriptsDest -Force
+
     $copiedSkills = @()
     Get-ChildItem -Directory $FlavorSkillsDest | ForEach-Object { $copiedSkills += $_.Name }
 
@@ -257,7 +264,7 @@ This project has **superharness** installed as a flavor-code plugin under
 ``.flavor/plugins/superharness/``. It registers a skill root that provides
 engineering-discipline skills for autonomous development, plus SessionStart /
 UserPromptSubmit / Stop hooks that inject ``HARNESS.md`` into every session and
-track ``/go`` tasks under ``.claude/superharness/ralph/``.
+track ``/go`` tasks under ``.flavor/superharness/ralph/``.
 
 Installed skills: $skillList
 
@@ -298,7 +305,7 @@ $FlavorEndMarker
     $giExisting = if (Test-Path $GitignorePath) { [IO.File]::ReadAllText($GitignorePath, $utf8) } else { '' }
     $flavorIgnoreLines = @(
         @{ Comment = '# superharness brainstorm mind-map session state (transient)'; Line = '.superharness/' },
-        @{ Comment = '# superharness ralph runtime state (per-task tracking + retry)'; Line = '.claude/superharness/ralph/' }
+        @{ Comment = '# superharness ralph runtime state (per-task tracking + retry)'; Line = '.flavor/superharness/ralph/' }
     )
     foreach ($entry in $flavorIgnoreLines) {
         if ($giExisting -notmatch [regex]::Escape($entry.Line)) {

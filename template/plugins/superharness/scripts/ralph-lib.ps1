@@ -1,7 +1,9 @@
 # Ralph state mechanism — zero-dependency PowerShell state library.
 #
 # Manages the four runtime files of a resumable autonomous-task loop, all under
-# <project>/.claude/superharness/ralph/ :
+# <project>/<state-root>/superharness/ralph/ where <state-root> follows the host:
+#   .claude  (Claude Code install: .claude/superharness marketplace)
+#   .flavor  (flavor-code install: .flavor/plugins/superharness)
 #   .current-task      one-line pointer to the active task (switch = rewrite the line)
 #   task.json          task-list snapshot {status,phase,sprint,tasks[],updated_at}
 #   trace.jsonl        append-only ledger, one {ts,phase,event,detail} JSON per line
@@ -13,9 +15,21 @@
 
 # ---------------------------------------------------------------- paths & helpers
 
+function Get-RalphStateRoot {
+    # Host detection: this library ships inside the host install, so its own path
+    # names the state root. $env:SUPERHARNESS_STATE_ROOT ('.claude' | '.flavor')
+    # forces a choice for unusual layouts; Claude Code is the historical default.
+    $forced = $env:SUPERHARNESS_STATE_ROOT
+    if ($forced -eq '.flavor' -or $forced -eq 'flavor') { return '.flavor' }
+    if ($forced -eq '.claude' -or $forced -eq 'claude') { return '.claude' }
+    if ($PSScriptRoot -match '[/\\]\.flavor[/\\]plugins[/\\]superharness[/\\]scripts') { return '.flavor' }
+    return '.claude'
+}
+
 function Get-RalphDir {
     param([Parameter(Mandatory)][string]$Root)
-    Join-Path $Root '.claude\superharness\ralph'
+    $stateRoot = Get-RalphStateRoot   # '.claude' or '.flavor'
+    Join-Path $Root (Join-Path $stateRoot 'superharness\ralph')
 }
 
 function Get-RalphIso { (Get-Date).ToString('yyyy-MM-ddTHH:mm:sszzz') }
