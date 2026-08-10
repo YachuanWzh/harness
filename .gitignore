@@ -13,3 +13,4 @@ superharness/trace/.state/
 .flavor
 # superharness ralph runtime state (per-task tracking + retry)
 .flavor/superharness/ralph/
+FLAVOR.md

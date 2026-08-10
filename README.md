@@ -90,16 +90,22 @@ flavor-code 侧会创建：
 初始化时可附带 `--template` 为项目注入对应技术栈的工程纪律指引（经 SessionStart 钩子每会话注入）：
 
 ```cmd
-superharness --template=frontend            :: 默认 React
+superharness --template=frontend                :: 默认 React
 superharness --template=frontend --stack=vue
-superharness --template=backend             :: 默认 Python
+superharness --template=backend                 :: 默认 Python
 superharness --template=backend --stack=java
 superharness --template=backend --stack=node
-superharness --template=fullstack           :: 固定 React + Python（不接受 --stack）
+superharness --template=fullstack               :: 默认 React + Python
+superharness --template=fullstack --frontend=vue                :: Vue + Python
+superharness --template=fullstack --backend=node                :: React + Node
+superharness --template=fullstack --frontend=vue --backend=node :: 自由组合
 ```
 
-合法 `--stack`：前端 `react|vue`，后端 `python|java|node`。指引文档随插件下发于
-`plugins\superharness\stacks\*.md`，选中的一份会被写入 `.claude\superharness\STACK.md`；
+合法 `--stack`：前端 `react|vue`，后端 `python|java|node`；`fullstack` 用
+`--frontend=react|vue` + `--backend=python|java|node` 自由组合（默认 React + Python），
+不接受 `--stack`。指引文档随插件下发于 `plugins\superharness\stacks\*.md`：单栈复制
+选中的一份；全栈拼接前后端两份指引 + 框架无关的接缝规则 `fullstack-seam.md`
+（API 契约、CORS、dev proxy、e2e），结果写入 `.claude\superharness\STACK.md`；
 不带 `--template` 的普通初始化不写该文件（已有的会被移除）。
 
 ### 2. 启动 Claude Code / flavor-code

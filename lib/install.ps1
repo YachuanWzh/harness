@@ -26,9 +26,9 @@ if (-not (Test-Path $TargetDir)) {
     exit 1
 }
 
-# --- Parse optional --template / --stack from forwarded CLI args ---
-$Template = $null; $Stack = $null
-$sawTemplateFlag = $false; $sawStackFlag = $false
+# --- Parse optional --template / --stack / --frontend / --backend from forwarded CLI args ---
+$Template = $null; $Stack = $null; $Frontend = $null; $Backend = $null
+$sawTemplateFlag = $false; $sawStackFlag = $false; $sawFrontendFlag = $false; $sawBackendFlag = $false
 foreach ($a in $Rest) {
     if ($a -match '^--template($|=)') {
         $sawTemplateFlag = $true
@@ -37,6 +37,14 @@ foreach ($a in $Rest) {
     elseif ($a -match '^--stack($|=)') {
         $sawStackFlag = $true
         if ($a -match '^--stack=(.+)$') { $Stack = $Matches[1].ToLower() }
+    }
+    elseif ($a -match '^--frontend($|=)') {
+        $sawFrontendFlag = $true
+        if ($a -match '^--frontend=(.+)$') { $Frontend = $Matches[1].ToLower() }
+    }
+    elseif ($a -match '^--backend($|=)') {
+        $sawBackendFlag = $true
+        if ($a -match '^--backend=(.+)$') { $Backend = $Matches[1].ToLower() }
     }
 }
 if ($sawTemplateFlag -and -not $Template) {
@@ -47,22 +55,41 @@ if ($sawStackFlag -and -not $Template) {
     Write-Error "--stack requires --template (stack is meaningless without a template)."
     exit 1
 }
+if (($sawFrontendFlag -or $sawBackendFlag) -and $Template -ne 'fullstack') {
+    Write-Error "--frontend/--backend only apply to --template=fullstack."
+    exit 1
+}
 
-# resolved stack-doc id, or $null when no --template given
+# resolved stack-doc id for single-stack templates (or $null when no --template given);
+# fullstack instead resolves $FullstackFront / $FullstackBack and concatenates docs.
 $StackDocId = $null
+$FullstackFront = $null
+$FullstackBack = $null
 if ($Template) {
     $valid = @{
         frontend  = @{ default = 'react';  stacks = @('react','vue') }
         backend   = @{ default = 'python'; stacks = @('python','java','node') }
-        fullstack = @{ default = $null;    stacks = @() }
-    }
-    if (-not $valid.ContainsKey($Template)) {
-        Write-Error "Unknown --template '$Template'. Valid: frontend, backend, fullstack."
-        exit 1
     }
     if ($Template -eq 'fullstack') {
-        if ($Stack) { Write-Error "--stack is not allowed with --template=fullstack (fixed React+Python)."; exit 1 }
-        $StackDocId = 'fullstack'
+        if ($Stack) {
+            Write-Error "--stack is not allowed with --template=fullstack; use --frontend=react|vue and --backend=python|java|node instead."
+            exit 1
+        }
+        if (-not $Frontend) { $Frontend = 'react' }
+        if (-not $Backend)  { $Backend = 'python' }
+        if ($valid['frontend'].stacks -notcontains $Frontend) {
+            Write-Error "Invalid --frontend '$Frontend'. Valid: react, vue."
+            exit 1
+        }
+        if ($valid['backend'].stacks -notcontains $Backend) {
+            Write-Error "Invalid --backend '$Backend'. Valid: python, java, node."
+            exit 1
+        }
+        $FullstackFront = $Frontend
+        $FullstackBack  = $Backend
+    } elseif (-not $valid.ContainsKey($Template)) {
+        Write-Error "Unknown --template '$Template'. Valid: frontend, backend, fullstack."
+        exit 1
     } else {
         if (-not $Stack) { $Stack = $valid[$Template].default }
         if ($valid[$Template].stacks -notcontains $Stack) {
@@ -79,6 +106,31 @@ function Set-Member {
     param($Object, [string]$Name, $Value)
     if ($Object.PSObject.Properties[$Name]) { $Object.$Name = $Value }
     else { $Object | Add-Member -NotePropertyName $Name -NotePropertyValue $Value }
+}
+
+# Write the active stack guidance. Single-stack templates copy one doc;
+# fullstack concatenates frontend + backend + seam docs into STACK.md.
+function Write-StackGuidance {
+    param([string]$StackRoot, [string]$TargetPath)
+    $stacksDir = Join-Path $StackRoot 'plugins\superharness\stacks'
+    if ($StackDocId) {
+        $src = Join-Path $stacksDir "$StackDocId.md"
+        if (-not (Test-Path $src)) { Write-Error "Stack guidance doc missing: $src"; exit 1 }
+        Copy-Item -Path $src -Destination $TargetPath -Force
+    } elseif ($FullstackFront) {
+        $front = Join-Path $stacksDir "frontend-$FullstackFront.md"
+        $back  = Join-Path $stacksDir "backend-$FullstackBack.md"
+        $seam  = Join-Path $stacksDir 'fullstack-seam.md'
+        foreach ($src in @($front, $back, $seam)) {
+            if (-not (Test-Path $src)) { Write-Error "Stack guidance doc missing: $src"; exit 1 }
+        }
+        $combined = (Get-Content $front -Raw).TrimEnd() + "`r`n`r`n" +
+                    (Get-Content $back -Raw).TrimEnd() + "`r`n`r`n" +
+                    (Get-Content $seam -Raw).TrimEnd() + "`r`n"
+        [IO.File]::WriteAllText($TargetPath, $combined, $utf8)
+    } elseif (Test-Path $TargetPath) {
+        Remove-Item $TargetPath -Force
+    }
 }
 
 # ============================================================================
@@ -110,13 +162,7 @@ if ($HasClaudeMarker) {
 
     # --- 1b. Active stack guidance ---
     $StackTarget = Join-Path $MarketDir 'STACK.md'
-    if ($StackDocId) {
-        $StackSource = Join-Path $MarketDir "plugins\superharness\stacks\$StackDocId.md"
-        if (-not (Test-Path $StackSource)) { Write-Error "Stack guidance doc missing: $StackSource"; exit 1 }
-        Copy-Item -Path $StackSource -Destination $StackTarget -Force
-    } elseif (Test-Path $StackTarget) {
-        Remove-Item $StackTarget -Force
-    }
+    Write-StackGuidance -StackRoot $MarketDir -TargetPath $StackTarget
 
     # --- 1c. Merge .claude/settings.json ---
     $SettingsPath = Join-Path $TargetDir '.claude\settings.json'
@@ -226,11 +272,7 @@ if ($HasFlavorMarker) {
     # --- 2a'. Docs consumed by the plugin hooks (SessionStart injects HARNESS.md) ---
     Copy-Item -Path (Join-Path $TemplateDir 'plugins\superharness\HARNESS.md') -Destination $FlavorPluginDir -Force
     $FlavorStackTarget = Join-Path $FlavorPluginDir 'STACK.md'
-    if ($StackDocId) {
-        Copy-Item -Path (Join-Path $TemplateDir "plugins\superharness\stacks\$StackDocId.md") -Destination $FlavorStackTarget -Force
-    } elseif (Test-Path $FlavorStackTarget) {
-        Remove-Item $FlavorStackTarget -Force
-    }
+    Write-StackGuidance -StackRoot $TemplateDir -TargetPath $FlavorStackTarget
 
     # --- 2b. Copy skills into .flavor/plugins/superharness/skills/ ---
     if (Test-Path $FlavorSkillsDest) { Remove-Item $FlavorSkillsDest -Recurse -Force }

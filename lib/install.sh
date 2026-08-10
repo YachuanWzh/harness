@@ -6,6 +6,7 @@
 #   - Both present -> both installed
 #
 # Usage: bash install.sh [--target-dir <project root>] [--template=<type>] [--stack=<tech>]
+#                        [--frontend=<tech>] [--backend=<tech>]
 #
 # JSON editing of .claude/settings.json uses `node` when available; otherwise a
 # marker-guarded text merge is applied (safe because we control the managed keys).
@@ -22,8 +23,12 @@ TARGET_DIR="$(pwd)"
 # ---------- parse CLI args ----------
 TEMPLATE=""
 STACK=""
+FRONTEND=""
+BACKEND=""
 SAW_TEMPLATE=0
 SAW_STACK=0
+SAW_FRONTEND=0
+SAW_BACKEND=0
 
 for a in "$@"; do
     case "$a" in
@@ -33,6 +38,10 @@ for a in "$@"; do
         --template)     SAW_TEMPLATE=1 ;;
         --stack=*)      SAW_STACK=1; STACK="${a#--stack=}"; STACK="$(printf '%s' "$STACK" | tr '[:upper:]' '[:lower:]')" ;;
         --stack)        SAW_STACK=1 ;;
+        --frontend=*)   SAW_FRONTEND=1; FRONTEND="${a#--frontend=}"; FRONTEND="$(printf '%s' "$FRONTEND" | tr '[:upper:]' '[:lower:]')" ;;
+        --frontend)     SAW_FRONTEND=1 ;;
+        --backend=*)    SAW_BACKEND=1; BACKEND="${a#--backend=}"; BACKEND="$(printf '%s' "$BACKEND" | tr '[:upper:]' '[:lower:]')" ;;
+        --backend)      SAW_BACKEND=1 ;;
         *)
             if [ "$TARGET_DIR" = "__NEXT__" ]; then TARGET_DIR="$a"; fi
             ;;
@@ -51,9 +60,15 @@ fi
 if [ "$SAW_STACK" = "1" ] && [ -z "$TEMPLATE" ]; then
     echo "Error: --stack requires --template (stack is meaningless without a template)." >&2; exit 1
 fi
+if { [ "$SAW_FRONTEND" = "1" ] || [ "$SAW_BACKEND" = "1" ]; } && [ "$TEMPLATE" != "fullstack" ]; then
+    echo "Error: --frontend/--backend only apply to --template=fullstack." >&2; exit 1
+fi
 
-# resolved stack-doc id, or empty when no --template given
+# resolved stack-doc id for single-stack templates, or empty when no --template given;
+# fullstack instead resolves FULLSTACK_FRONT / FULLSTACK_BACK and concatenates docs.
 STACK_DOC_ID=""
+FULLSTACK_FRONT=""
+FULLSTACK_BACK=""
 if [ -n "$TEMPLATE" ]; then
     case "$TEMPLATE" in
         frontend)
@@ -65,8 +80,13 @@ if [ -n "$TEMPLATE" ]; then
             case "$STACK" in python|java|node) ;; *) echo "Error: Invalid --stack '$STACK' for --template=backend. Valid: python, java, node." >&2; exit 1 ;; esac
             STACK_DOC_ID="backend-$STACK" ;;
         fullstack)
-            if [ -n "$STACK" ]; then echo "Error: --stack is not allowed with --template=fullstack (fixed React+Python)." >&2; exit 1; fi
-            STACK_DOC_ID="fullstack" ;;
+            if [ -n "$STACK" ]; then echo "Error: --stack is not allowed with --template=fullstack; use --frontend=react|vue and --backend=python|java|node instead." >&2; exit 1; fi
+            [ -n "$FRONTEND" ] || FRONTEND="react"
+            [ -n "$BACKEND" ] || BACKEND="python"
+            case "$FRONTEND" in react|vue) ;; *) echo "Error: Invalid --frontend '$FRONTEND'. Valid: react, vue." >&2; exit 1 ;; esac
+            case "$BACKEND" in python|java|node) ;; *) echo "Error: Invalid --backend '$BACKEND'. Valid: python, java, node." >&2; exit 1 ;; esac
+            FULLSTACK_FRONT="$FRONTEND"
+            FULLSTACK_BACK="$BACKEND" ;;
         *)
             echo "Error: Unknown --template '$TEMPLATE'. Valid: frontend, backend, fullstack." >&2; exit 1 ;;
     esac
@@ -149,6 +169,29 @@ EOF
     fi
 }
 
+# Write the active stack guidance. Single-stack templates copy one doc;
+# fullstack concatenates frontend + backend + seam docs into STACK.md.
+# $1=source root (contains plugins/superharness/stacks)  $2=target STACK.md path
+write_stack_guidance() {
+    local source_root="$1" target="$2"
+    local stacks_dir="$source_root/plugins/superharness/stacks"
+    if [ -n "$STACK_DOC_ID" ]; then
+        local src="$stacks_dir/$STACK_DOC_ID.md"
+        [ -f "$src" ] || { echo "Stack guidance doc missing: $src" >&2; exit 1; }
+        cp -f "$src" "$target"
+    elif [ -n "$FULLSTACK_FRONT" ]; then
+        local front="$stacks_dir/frontend-$FULLSTACK_FRONT.md"
+        local back="$stacks_dir/backend-$FULLSTACK_BACK.md"
+        local seam="$stacks_dir/fullstack-seam.md"
+        [ -f "$front" ] || { echo "Stack guidance doc missing: $front" >&2; exit 1; }
+        [ -f "$back" ] || { echo "Stack guidance doc missing: $back" >&2; exit 1; }
+        [ -f "$seam" ] || { echo "Stack guidance doc missing: $seam" >&2; exit 1; }
+        { cat "$front"; printf '\n'; cat "$back"; printf '\n'; cat "$seam"; } > "$target"
+    else
+        rm -f "$target"
+    fi
+}
+
 # ---------- 0. detect project type ----------
 
 HAS_CLAUDE=0
@@ -178,13 +221,7 @@ if [ "$HAS_CLAUDE" = "1" ]; then
 
     # --- 1b. Active stack guidance ---
     STACK_TARGET="$MARKET_DIR/STACK.md"
-    if [ -n "$STACK_DOC_ID" ]; then
-        STACK_SOURCE="$MARKET_DIR/plugins/superharness/stacks/$STACK_DOC_ID.md"
-        [ -f "$STACK_SOURCE" ] || { echo "Stack guidance doc missing: $STACK_SOURCE" >&2; exit 1; }
-        cp -f "$STACK_SOURCE" "$STACK_TARGET"
-    else
-        rm -f "$STACK_TARGET"
-    fi
+    write_stack_guidance "$MARKET_DIR" "$STACK_TARGET"
 
     # --- 1c. Merge .claude/settings.json ---
     mkdir -p "$TARGET_DIR/.claude"
@@ -249,11 +286,7 @@ if [ "$HAS_FLAVOR" = "1" ]; then
 
     # --- 2a'. Docs consumed by the plugin hooks (SessionStart injects HARNESS.md) ---
     cp -f "$TEMPLATE_DIR/plugins/superharness/HARNESS.md" "$FLAVOR_PLUGIN_DIR/"
-    if [ -n "$STACK_DOC_ID" ]; then
-        cp -f "$TEMPLATE_DIR/plugins/superharness/stacks/$STACK_DOC_ID.md" "$FLAVOR_PLUGIN_DIR/STACK.md"
-    else
-        rm -f "$FLAVOR_PLUGIN_DIR/STACK.md"
-    fi
+    write_stack_guidance "$TEMPLATE_DIR" "$FLAVOR_PLUGIN_DIR/STACK.md"
 
     # --- 2b. Copy skills into .flavor/plugins/superharness/skills/ ---
     rm -rf "$FLAVOR_SKILLS_DEST"

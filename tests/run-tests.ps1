@@ -29,10 +29,12 @@ function New-TempProject {
 }
 
 function Invoke-Installer {
-    param([string]$TargetDir, [string]$Template, [string]$Stack)
+    param([string]$TargetDir, [string]$Template, [string]$Stack, [string]$Frontend, [string]$Backend)
     $extra = @()
-    if ($Template) { $extra += "--template=$Template" }
-    if ($Stack)    { $extra += "--stack=$Stack" }
+    if ($Template)  { $extra += "--template=$Template" }
+    if ($Stack)     { $extra += "--stack=$Stack" }
+    if ($Frontend)  { $extra += "--frontend=$Frontend" }
+    if ($Backend)   { $extra += "--backend=$Backend" }
     & powershell -NoProfile -ExecutionPolicy Bypass -File $InstallScript -TargetDir $TargetDir @extra | Out-Null
     return $LASTEXITCODE
 }
@@ -317,7 +319,6 @@ $stackDocs = @{
     'backend-python.md' = 'pytest'
     'backend-java.md'   = 'JUnit'
     'backend-node.md'   = 'Jest'
-    'fullstack.md'      = 'React'
 }
 foreach ($doc in $stackDocs.Keys) {
     $p = Join-Path $stacksDir $doc
@@ -326,9 +327,11 @@ foreach ($doc in $stackDocs.Keys) {
     Assert-True ($body -match $stackDocs[$doc]) "stacks/$doc mentions $($stackDocs[$doc])"
     Assert-True ($body -match 'TDD|test') "stacks/$doc covers testing discipline"
 }
-$fs = Join-Path $stacksDir 'fullstack.md'
-$fsBody = if (Test-Path $fs) { Get-Content $fs -Raw } else { '' }
-Assert-True ($fsBody -match 'Python') "stacks/fullstack.md mentions Python (combined stack)"
+$seam = Join-Path $stacksDir 'fullstack-seam.md'
+$seamBody = if (Test-Path $seam) { Get-Content $seam -Raw } else { '' }
+Assert-True ($seamBody -match 'API contract') "stacks/fullstack-seam.md covers the integration seam"
+Assert-True ($seamBody -match 'CORS') "stacks/fullstack-seam.md covers CORS"
+Assert-True ($seamBody -match 'TDD|test') "stacks/fullstack-seam.md covers testing discipline"
 
 # ---------------------------------------------------------------- Test group 9: --template validation + resolution
 Write-Host "`n[9] Installer resolves --template/--stack into STACK.md"
@@ -361,17 +364,36 @@ $pn = New-TempProject
 Invoke-Installer -TargetDir $pn -Template 'backend' -Stack 'node' | Out-Null
 Assert-True ((Get-Content (Get-StackFile $pn) -Raw) -match 'Jest|Node') "backend --stack=node STACK.md is Node"
 
-# 9e. fullstack -> React + Python
+# 9e. fullstack default -> React + Python
 $pfs = New-TempProject
 Invoke-Installer -TargetDir $pfs -Template 'fullstack' | Out-Null
 $fsB = Get-Content (Get-StackFile $pfs) -Raw
 Assert-True ($fsB -match 'React' -and $fsB -match 'Python') "fullstack STACK.md mentions React and Python"
 Assert-True ($fsB -match 'seam|API contract') "fullstack STACK.md covers the integration seam"
 
+# 9e2. fullstack --frontend=vue --backend=node (free combination)
+$pfs2 = New-TempProject
+Invoke-Installer -TargetDir $pfs2 -Template 'fullstack' -Frontend 'vue' -Backend 'node' | Out-Null
+$fsB2 = Get-Content (Get-StackFile $pfs2) -Raw
+Assert-True ($fsB2 -match 'Vue') "fullstack --frontend=vue picks Vue"
+Assert-True ($fsB2 -match 'Jest|Node') "fullstack --backend=node picks Node"
+Assert-True ($fsB2 -match 'API contract') "fullstack combination still covers the seam"
+Assert-True ($fsB2 -notmatch 'This project''s frontend is \*\*React') "fullstack --frontend=vue does not include React guidance"
+
+# 9e3. fullstack --frontend=react --backend=java
+$pfs3 = New-TempProject
+Invoke-Installer -TargetDir $pfs3 -Template 'fullstack' -Frontend 'react' -Backend 'java' | Out-Null
+$fsB3 = Get-Content (Get-StackFile $pfs3) -Raw
+Assert-True ($fsB3 -match 'React' -and $fsB3 -match 'JUnit') "fullstack --frontend=react --backend=java combines React and Java"
+
 # 9f. errors -> non-zero exit
 Assert-True ((Invoke-Installer -TargetDir (New-TempProject) -Template 'bogus') -ne 0) "invalid --template exits non-zero"
 Assert-True ((Invoke-Installer -TargetDir (New-TempProject) -Template 'frontend' -Stack 'python') -ne 0) "invalid stack for template exits non-zero"
 Assert-True ((Invoke-Installer -TargetDir (New-TempProject) -Template 'fullstack' -Stack 'react') -ne 0) "fullstack + --stack exits non-zero"
+Assert-True ((Invoke-Installer -TargetDir (New-TempProject) -Template 'fullstack' -Frontend 'svelte') -ne 0) "invalid --frontend exits non-zero"
+Assert-True ((Invoke-Installer -TargetDir (New-TempProject) -Template 'fullstack' -Backend 'ruby') -ne 0) "invalid --backend exits non-zero"
+Assert-True ((Invoke-Installer -TargetDir (New-TempProject) -Template 'frontend' -Frontend 'vue') -ne 0) "--frontend outside fullstack exits non-zero"
+Assert-True ((Invoke-Installer -TargetDir (New-TempProject) -Template 'fullstack' -Frontend 'vue' -Backend 'ruby') -ne 0) "invalid --backend with valid --frontend exits non-zero"
 
 # 9f2. malformed input -> non-zero exit (don't silently plain-install)
 $InstallScriptRef = $InstallScript
@@ -392,7 +414,7 @@ Assert-True (-not (Test-Path (Get-StackFile $pnone))) "no --template leaves no S
 Invoke-Installer -TargetDir $pf | Out-Null
 Assert-True (-not (Test-Path (Get-StackFile $pf))) "plain re-install removes a previously written STACK.md"
 
-Remove-Item $pf, $pv, $pb, $pj, $pn, $pfs, $pnone -Recurse -Force -ErrorAction SilentlyContinue
+Remove-Item $pf, $pv, $pb, $pj, $pn, $pfs, $pfs2, $pfs3, $pnone -Recurse -Force -ErrorAction SilentlyContinue
 
 # ---------------------------------------------------------------- Test group 10: hook injects STACK.md
 Write-Host "`n[10] session-start.ps1 appends STACK.md when present"

@@ -23,3 +23,37 @@ Key capabilities:
 
 Usage in flavor-code: `/<skill-name> <args>`, e.g. `/go refactor login module` or `/brainstorm payment plan`.
 <!-- SUPERHARNESS:FLAVOR-END -->
+
+<!-- flavor-code:start -->
+## Overview
+
+- Project: superharness
+- Languages: JavaScript
+- Package manager: not detected
+
+## Layout
+
+- `lib`
+- `tests`
+
+## Build
+
+No verified build command detected.
+
+## Test
+
+No verified test command detected.
+
+## Quality
+
+No verified lint or format command detected.
+
+## Conventions
+
+- Follow `CLAUDE.md`.
+
+## Cautions
+
+- Do not read or copy secrets from environment files.
+- Do not inspect dependency directories or generated output unless explicitly required.
+<!-- flavor-code:end -->
