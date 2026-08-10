@@ -1,3 +1,7 @@
+
+
+## answer my question in Chinese
+
 <!-- SUPERHARNESS:BEGIN -->
 ## Superharness
 
@@ -16,5 +20,3 @@ engineering work.
 - Non-negotiable: strict TDD (failing test first), systematic debugging, and
   verification with real command output before claiming anything is done.
 <!-- SUPERHARNESS:END -->
-
-## answer my question in Chinese

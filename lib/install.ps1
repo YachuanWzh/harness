@@ -4,7 +4,7 @@
 #   - flavor-code projects (FLAVOR.md / .flavor)   → .flavor/plugins/superharness/
 #   - Both present → both installed
 #
-# Usage: powershell -File install.ps1 [-TargetDir <project root>]
+# Usage: powershell -File install.ps1 [-TargetDir <project root>] [--template=...] [--uninstall]
 
 param(
     [string]$TargetDir = (Get-Location).Path,
@@ -14,10 +14,14 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+# --uninstall / -uninstall switches to revert mode (must be known before the
+# template checks below run, so scan $Rest up front).
+$Uninstall = $Rest -contains '--uninstall' -or $Rest -contains '-uninstall'
+
 $RepoRoot = Split-Path -Parent $PSScriptRoot
 $TemplateDir = Join-Path $RepoRoot 'template'
 
-if (-not (Test-Path $TemplateDir)) {
+if (-not $Uninstall -and -not (Test-Path $TemplateDir)) {
     Write-Error "Template directory not found: $TemplateDir"
     exit 1
 }
@@ -26,7 +30,144 @@ if (-not (Test-Path $TargetDir)) {
     exit 1
 }
 
-# --- Parse optional --template / --stack / --frontend / --backend from forwarded CLI args ---
+# ============================================================================
+# 0. Uninstall mode — revert everything the installer adds (and only that)
+# ============================================================================
+if ($Uninstall) {
+    $utf8 = New-Object System.Text.UTF8Encoding($false)
+
+    # Drop the managed .gitignore blocks: a '# superharness ...' comment line
+    # followed by the runtime pattern we appended.
+    function Remove-ManagedGitignoreLines {
+        param([string]$Path, [string[]]$Patterns)
+        if (-not (Test-Path $Path)) { return $false }
+        $lines = [IO.File]::ReadAllLines($Path)
+        $out = New-Object System.Collections.Generic.List[string]
+        $changed = $false
+        for ($i = 0; $i -lt $lines.Count; $i++) {
+            $line = $lines[$i]
+            if ($line -match '^# superharness ') {
+                $changed = $true
+                if ($i + 1 -lt $lines.Count -and $Patterns -contains $lines[$i + 1].Trim()) {
+                    $i++
+                }
+                continue
+            }
+            $out.Add($line)
+        }
+        if (-not $changed) { return $false }
+        $text = ($out -join "`r`n").TrimEnd()
+        if ($text -eq '') {
+            Remove-Item $Path -Force
+        } else {
+            [IO.File]::WriteAllText($Path, $text + "`r`n", $utf8)
+        }
+        return $true
+    }
+
+    # Remove the managed marker section from a markdown file. Returns $true if
+    # a section was removed. A file left empty is deleted (installer-created).
+    function Remove-ManagedSection {
+        param([string]$Path, [string]$BeginMarker, [string]$EndMarker)
+        if (-not (Test-Path $Path)) { return $false }
+        $existing = [IO.File]::ReadAllText($Path, $utf8)
+        $pattern = [regex]::Escape($BeginMarker) + '[\s\S]*?' + [regex]::Escape($EndMarker)
+        $updated = [regex]::Replace($existing, $pattern, '')
+        if ($updated -eq $existing) { return $false }
+        $updated = $updated.TrimEnd() + "`r`n"
+        if ($updated.Trim() -eq '') {
+            Remove-Item $Path -Force
+        } else {
+            [IO.File]::WriteAllText($Path, $updated, $utf8)
+        }
+        return $true
+    }
+
+    Write-Host "Superharness uninstall..." -ForegroundColor Cyan
+    $UninstalledAnything = $false
+
+    # --- Claude Code side ---
+    $MarketDir = Join-Path $TargetDir '.claude\superharness'
+    if (Test-Path $MarketDir) {
+        Remove-Item $MarketDir -Recurse -Force
+        Write-Host "  Removed $MarketDir" -ForegroundColor Green
+        $UninstalledAnything = $true
+    }
+    $LegacyDir = Join-Path $TargetDir '.claude\skills\superharness'
+    if (Test-Path $LegacyDir) {
+        Remove-Item $LegacyDir -Recurse -Force
+        Write-Host "  Removed legacy $LegacyDir" -ForegroundColor Green
+        $UninstalledAnything = $true
+    }
+
+    # .claude/settings.json — drop only the superharness keys we merge in
+    $SettingsPath = Join-Path $TargetDir '.claude\settings.json'
+    if (Test-Path $SettingsPath) {
+        $settings = $null
+        try { $settings = [IO.File]::ReadAllText($SettingsPath, $utf8) | ConvertFrom-Json } catch {}
+        if ($null -ne $settings) {
+            $settingsChanged = $false
+            if ($settings.PSObject.Properties['extraKnownMarketplaces']) {
+                $settings.extraKnownMarketplaces.PSObject.Properties.Remove('superharness') | Out-Null
+                $settingsChanged = $true
+                if (@($settings.extraKnownMarketplaces.PSObject.Properties).Count -eq 0) {
+                    $settings.PSObject.Properties.Remove('extraKnownMarketplaces') | Out-Null
+                }
+            }
+            if ($settings.PSObject.Properties['enabledPlugins']) {
+                $settings.enabledPlugins.PSObject.Properties.Remove('superharness@superharness') | Out-Null
+                $settingsChanged = $true
+                if (@($settings.enabledPlugins.PSObject.Properties).Count -eq 0) {
+                    $settings.PSObject.Properties.Remove('enabledPlugins') | Out-Null
+                }
+            }
+            if ($settingsChanged) {
+                if (@($settings.PSObject.Properties).Count -eq 0) {
+                    Remove-Item $SettingsPath -Force
+                } else {
+                    [IO.File]::WriteAllText($SettingsPath, ($settings | ConvertTo-Json -Depth 16), $utf8)
+                }
+            }
+        }
+    }
+
+    # CLAUDE.md — remove the managed section
+    if (Remove-ManagedSection -Path (Join-Path $TargetDir 'CLAUDE.md') -BeginMarker '<!-- SUPERHARNESS:BEGIN -->' -EndMarker '<!-- SUPERHARNESS:END -->') {
+        $UninstalledAnything = $true
+    }
+
+    # --- flavor-code side ---
+    $FlavorPluginDir = Join-Path $TargetDir '.flavor\plugins\superharness'
+    if (Test-Path $FlavorPluginDir) {
+        Remove-Item $FlavorPluginDir -Recurse -Force
+        Write-Host "  Removed $FlavorPluginDir" -ForegroundColor Green
+        $UninstalledAnything = $true
+    }
+
+    # FLAVOR.md — remove the managed section
+    if (Remove-ManagedSection -Path (Join-Path $TargetDir 'FLAVOR.md') -BeginMarker '<!-- SUPERHARNESS:FLAVOR-BEGIN -->' -EndMarker '<!-- SUPERHARNESS:FLAVOR-END -->') {
+        $UninstalledAnything = $true
+    }
+
+    # .gitignore — drop the managed runtime-state blocks (both hosts)
+    $GitignorePath = Join-Path $TargetDir '.gitignore'
+    if (Test-Path $GitignorePath) {
+        $giChanged = Remove-ManagedGitignoreLines -Path $GitignorePath -Patterns @(
+            '.claude/superharness/ralph/', '.claude/superharness/brainstorm/',
+            '.superharness/', '.flavor/superharness/ralph/'
+        )
+        if ($giChanged) { $UninstalledAnything = $true }
+    }
+
+    if (-not $UninstalledAnything) {
+        Write-Host "No superharness install found in $TargetDir. Nothing to uninstall." -ForegroundColor Yellow
+    } else {
+        Write-Host "Superharness uninstalled from $TargetDir. Your other project settings were left untouched." -ForegroundColor Green
+    }
+    exit 0
+}
+
+# --- Parse optional --template / --stack / --frontend / --backend / --uninstall from forwarded CLI args ---
 $Template = $null; $Stack = $null; $Frontend = $null; $Backend = $null
 $sawTemplateFlag = $false; $sawStackFlag = $false; $sawFrontendFlag = $false; $sawBackendFlag = $false
 foreach ($a in $Rest) {

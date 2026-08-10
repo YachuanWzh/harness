@@ -39,6 +39,12 @@ function Invoke-Installer {
     return $LASTEXITCODE
 }
 
+function Invoke-Uninstaller {
+    param([string]$TargetDir)
+    & powershell -NoProfile -ExecutionPolicy Bypass -File $InstallScript -TargetDir $TargetDir --uninstall | Out-Null
+    return $LASTEXITCODE
+}
+
 function Get-MarketDir { param([string]$ProjectDir) Join-Path $ProjectDir '.claude\superharness' }
 function Get-PluginDir { param([string]$ProjectDir) Join-Path $ProjectDir '.claude\superharness\plugins\superharness' }
 
@@ -788,6 +794,76 @@ Assert-True ($tail20.Count -eq 1 -and $tail20[0].event -eq 'task:started') "appe
 Assert-True ($tail20[0].detail -eq 'do the demo') "trace detail carries the goal"
 Assert-True ((Get-RalphRetryState -Root $rp20).retries -eq 0) "resets the retry counter"
 Remove-Item $rp20 -Recurse -Force -ErrorAction SilentlyContinue
+
+# ---------------------------------------------------------------- Test group 22: --uninstall
+Write-Host "`n[22] superharness --uninstall removes what the installer added (and only that)"
+
+# 22a. basic Claude Code uninstall round-trip on an installer-created project
+$pu = New-TempProject
+Assert-True ((Invoke-Installer -TargetDir $pu) -eq 0) "installer exits 0 before uninstall"
+Assert-True (Test-Path (Get-MarketDir $pu)) "marketplace exists after install"
+Assert-True ((Invoke-Uninstaller -TargetDir $pu) -eq 0) "uninstall exits 0"
+Assert-True (-not (Test-Path (Get-MarketDir $pu))) "removes .claude/superharness/ marketplace"
+Assert-True (-not (Test-Path (Join-Path $pu '.claude\settings.json'))) "removes installer-created settings.json (was not present before)"
+Assert-True (-not (Test-Path (Join-Path $pu 'CLAUDE.md'))) "removes installer-created CLAUDE.md (was not present before)"
+Assert-True (-not (Test-Path (Join-Path $pu '.gitignore'))) "removes installer-created .gitignore (was not present before)"
+
+# 22b. user content is preserved while superharness keys/lines are removed
+$pu2 = New-TempProject
+New-Item -ItemType Directory -Force (Join-Path $pu2 '.claude') | Out-Null
+Set-Content -Path (Join-Path $pu2 '.claude\settings.json') -Value '{"model":"opus","enabledPlugins":{"other@mp":true}}' -Encoding utf8
+Set-Content -Path (Join-Path $pu2 'CLAUDE.md') -Value '# My rules' -Encoding utf8
+Set-Content -Path (Join-Path $pu2 '.gitignore') -Value 'node_modules/' -Encoding utf8
+Invoke-Installer -TargetDir $pu2 | Out-Null
+Invoke-Uninstaller -TargetDir $pu2 | Out-Null
+$st22 = Get-Content (Join-Path $pu2 '.claude\settings.json') -Raw | ConvertFrom-Json
+Assert-True ($st22.model -eq 'opus') "uninstall keeps user settings keys"
+Assert-True ($st22.enabledPlugins.'other@mp' -eq $true) "uninstall keeps other enabledPlugins entries"
+Assert-True ($null -eq $st22.enabledPlugins.'superharness@superharness') "uninstall removes the superharness enabledPlugins entry"
+Assert-True ($null -eq $st22.extraKnownMarketplaces.superharness) "uninstall removes the superharness marketplace entry"
+$cm22 = Get-Content (Join-Path $pu2 'CLAUDE.md') -Raw
+Assert-True ($cm22 -match 'My rules') "uninstall keeps existing CLAUDE.md content"
+Assert-True ($cm22 -notmatch 'SUPERHARNESS:BEGIN') "uninstall removes the SUPERHARNESS section from CLAUDE.md"
+$gi22 = Get-Content (Join-Path $pu2 '.gitignore') -Raw
+Assert-True ($gi22 -match 'node_modules/') "uninstall keeps existing .gitignore entries"
+Assert-True ($gi22 -notmatch 'superharness') "uninstall removes superharness runtime ignore lines"
+
+# 22c. flavor-code side round-trip
+$pf22 = New-TempProject
+Set-Content -Path (Join-Path $pf22 'FLAVOR.md') -Value '# flavor rules' -Encoding utf8
+Invoke-Installer -TargetDir $pf22 | Out-Null
+Assert-True (Test-Path (Join-Path $pf22 '.flavor\plugins\superharness')) "flavor plugin installed"
+Invoke-Uninstaller -TargetDir $pf22 | Out-Null
+Assert-True (-not (Test-Path (Join-Path $pf22 '.flavor\plugins\superharness'))) "uninstall removes .flavor/plugins/superharness/"
+$fm22 = Get-Content (Join-Path $pf22 'FLAVOR.md') -Raw
+Assert-True ($fm22 -match 'flavor rules') "uninstall keeps existing FLAVOR.md content"
+Assert-True ($fm22 -notmatch 'SUPERHARNESS:FLAVOR-BEGIN') "uninstall removes the SUPERHARNESS section from FLAVOR.md"
+
+# 22d. no-install no-op + idempotent second run
+$pd22 = New-TempProject
+Assert-True ((Invoke-Uninstaller -TargetDir $pd22) -eq 0) "uninstall on a clean project exits 0 (no-op)"
+$pu22 = New-TempProject
+Invoke-Installer -TargetDir $pu22 | Out-Null
+Invoke-Uninstaller -TargetDir $pu22 | Out-Null
+Assert-True ((Invoke-Uninstaller -TargetDir $pu22) -eq 0) "second uninstall exits 0 (idempotent)"
+
+Remove-Item $pu, $pu2, $pf22, $pd22, $pu22 -Recurse -Force -ErrorAction SilentlyContinue
+
+# ---------------------------------------------------------------- Test group 23: finishing-a-development-branch skill
+Write-Host "`n[23] finishing-a-development-branch skill closes the go loop"
+
+$finPath = Join-Path $plugin 'skills\finishing-a-development-branch\SKILL.md'
+Assert-True (Test-Path $finPath) "ships skills/finishing-a-development-branch/SKILL.md"
+$finMd = if (Test-Path $finPath) { Get-Content $finPath -Raw } else { '' }
+Assert-True ($finMd -match 'git worktree remove') "finishing skill removes the worktree"
+Assert-True ($finMd -match 'git branch -d') "finishing skill deletes the merged branch"
+Assert-True ($finMd -match '(?i)merge') "finishing skill merges the branch back"
+Assert-True ($finMd -match '(?i)never push|do not push|push.*human|human.*push') "finishing skill leaves pushing to the human"
+
+$goMd23 = Get-Content (Join-Path $plugin 'skills\go\SKILL.md') -Raw
+Assert-True ($goMd23 -match 'finishing-a-development-branch') "go skill delegates finishing to finishing-a-development-branch"
+$harnessDoc23 = Get-Content (Join-Path $plugin 'HARNESS.md') -Raw
+Assert-True ($harnessDoc23 -match 'finishing-a-development-branch') "HARNESS.md lists finishing-a-development-branch"
 
 # ---------------------------------------------------------------- cleanup + summary
 Remove-Item $proj, $proj2, $proj3, $proj4, $emptyDir -Recurse -Force -ErrorAction SilentlyContinue

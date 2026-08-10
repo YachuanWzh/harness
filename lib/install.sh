@@ -6,7 +6,7 @@
 #   - Both present -> both installed
 #
 # Usage: bash install.sh [--target-dir <project root>] [--template=<type>] [--stack=<tech>]
-#                        [--frontend=<tech>] [--backend=<tech>]
+#                        [--frontend=<tech>] [--backend=<tech>] [--uninstall]
 #
 # JSON editing of .claude/settings.json uses `node` when available; otherwise a
 # marker-guarded text merge is applied (safe because we control the managed keys).
@@ -18,13 +18,12 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 TEMPLATE_DIR="$REPO_ROOT/template"
 TARGET_DIR="$(pwd)"
 
-[ -d "$TEMPLATE_DIR" ] || { echo "Template directory not found: $TEMPLATE_DIR" >&2; exit 1; }
-
 # ---------- parse CLI args ----------
 TEMPLATE=""
 STACK=""
 FRONTEND=""
 BACKEND=""
+UNINSTALL=0
 SAW_TEMPLATE=0
 SAW_STACK=0
 SAW_FRONTEND=0
@@ -32,6 +31,7 @@ SAW_BACKEND=0
 
 for a in "$@"; do
     case "$a" in
+        --uninstall|-uninstall) UNINSTALL=1 ;;
         --target-dir=*) TARGET_DIR="${a#--target-dir=}" ;;
         --target-dir)   TARGET_DIR="__NEXT__" ;;
         --template=*)   SAW_TEMPLATE=1; TEMPLATE="${a#--template=}"; TEMPLATE="$(printf '%s' "$TEMPLATE" | tr '[:upper:]' '[:lower:]')" ;;
@@ -53,6 +53,160 @@ if [ "$TARGET_DIR" = "__NEXT__" ]; then
 fi
 
 [ -d "$TARGET_DIR" ] || { echo "Target directory not found: $TARGET_DIR" >&2; exit 1; }
+
+# ============================================================================
+# 0. Uninstall mode — revert everything the installer adds (and only that).
+#    Placed before any --template validation so `--uninstall` always wins.
+# ============================================================================
+if [ "$UNINSTALL" = "1" ]; then
+    # Remove a marker-delimited managed section from a markdown file.
+    # $1=file  $2=begin marker  $3=end marker. Returns 0 when a section was removed.
+    remove_managed_section() {
+        local file="$1" begin="$2" end="$3"
+        [ -f "$file" ] || return 1
+        if ! grep -qF "$begin" "$file"; then return 1; fi
+        local tmp="$file.tmp.$$"
+        awk -v b="$begin" -v e="$end" '
+            $0 == b { skip = 1; next }
+            skip && $0 == e { skip = 0; next }
+            !skip { print }
+        ' "$file" > "$tmp"
+        if cmp -s "$file" "$tmp"; then rm -f "$tmp"; return 1; fi
+        local text
+        text="$(cat "$tmp")"
+        if [ -z "$text" ]; then
+            # installer-created file: empty after removal -> drop it
+            rm -f "$tmp" "$file"
+        else
+            printf '%s\n' "$text" > "$tmp"
+            mv "$tmp" "$file"
+        fi
+        return 0
+    }
+
+    # Remove the managed '# superharness ...' comment + following pattern lines
+    # from .gitignore. $1=.gitignore path, remaining args are the managed patterns.
+    # Returns 0 when any line was removed.
+    remove_gitignore_entries() {
+        local gi="$1"; shift
+        local patterns=("$@")
+        [ -f "$gi" ] || return 1
+        local tmp="$gi.tmp.$$"
+        : > "$tmp"
+        local line skip_next matched p
+        skip_next=0
+        while IFS= read -r line || [ -n "$line" ]; do
+            case "$line" in
+                '# superharness '*)
+                    skip_next=1
+                    continue ;;
+            esac
+            if [ "$skip_next" = "1" ]; then
+                skip_next=0
+                matched=0
+                for p in "${patterns[@]}"; do
+                    if [ "$line" = "$p" ]; then matched=1; break; fi
+                done
+                [ "$matched" = "1" ] && continue
+            fi
+            printf '%s\n' "$line" >> "$tmp"
+        done < "$gi"
+        if cmp -s "$gi" "$tmp"; then rm -f "$tmp"; return 1; fi
+        local text
+        text="$(cat "$tmp")"
+        if [ -z "$text" ]; then
+            rm -f "$tmp" "$gi"
+        else
+            printf '%s\n' "$text" > "$tmp"
+            mv "$tmp" "$gi"
+        fi
+        return 0
+    }
+
+    # Remove the superharness keys from .claude/settings.json. Uses node; a
+    # malformed file is left untouched. Always returns 0 so `set -e` cannot abort.
+    unmerge_claude_settings() {
+        local settings="$1"
+        if command -v node >/dev/null 2>&1; then
+            node - "$settings" <<'EOF' || true
+const fs = require('fs');
+const p = process.argv[2];
+let raw;
+try { raw = fs.readFileSync(p, 'utf8'); } catch { process.exit(0); }
+let s;
+try { s = JSON.parse(raw); } catch { process.exit(0); }
+let changed = false;
+if (s.extraKnownMarketplaces && typeof s.extraKnownMarketplaces === 'object') {
+    if ('superharness' in s.extraKnownMarketplaces) { delete s.extraKnownMarketplaces.superharness; changed = true; }
+    if (Object.keys(s.extraKnownMarketplaces).length === 0) { delete s.extraKnownMarketplaces; }
+}
+if (s.enabledPlugins && typeof s.enabledPlugins === 'object') {
+    if ('superharness@superharness' in s.enabledPlugins) { delete s.enabledPlugins['superharness@superharness']; changed = true; }
+    if (Object.keys(s.enabledPlugins).length === 0) { delete s.enabledPlugins; }
+}
+if (!changed) process.exit(0);
+if (Object.keys(s).length === 0) { fs.rmSync(p); } else { fs.writeFileSync(p, JSON.stringify(s, null, 2) + '\n'); }
+EOF
+        else
+            echo "WARNING: node not found; please remove extraKnownMarketplaces.superharness and" >&2
+            echo "  enabledPlugins[\"superharness@superharness\"] manually from $settings." >&2
+        fi
+        return 0
+    }
+
+    echo "Superharness uninstall..."
+    UNINSTALLED_ANYTHING=0
+
+    # --- Claude Code side ---
+    if [ -d "$TARGET_DIR/.claude/superharness" ]; then
+        rm -rf "$TARGET_DIR/.claude/superharness"
+        echo "  Removed $TARGET_DIR/.claude/superharness"
+        UNINSTALLED_ANYTHING=1
+    fi
+    if [ -d "$TARGET_DIR/.claude/skills/superharness" ]; then
+        rm -rf "$TARGET_DIR/.claude/skills/superharness"
+        echo "  Removed legacy $TARGET_DIR/.claude/skills/superharness"
+        UNINSTALLED_ANYTHING=1
+    fi
+    if [ -f "$TARGET_DIR/.claude/settings.json" ]; then
+        unmerge_claude_settings "$TARGET_DIR/.claude/settings.json"
+    fi
+
+    if remove_managed_section "$TARGET_DIR/CLAUDE.md" \
+        '<!-- SUPERHARNESS:BEGIN -->' '<!-- SUPERHARNESS:END -->'; then
+        UNINSTALLED_ANYTHING=1
+    fi
+
+    # --- flavor-code side ---
+    if [ -d "$TARGET_DIR/.flavor/plugins/superharness" ]; then
+        rm -rf "$TARGET_DIR/.flavor/plugins/superharness"
+        echo "  Removed $TARGET_DIR/.flavor/plugins/superharness"
+        UNINSTALLED_ANYTHING=1
+    fi
+    if remove_managed_section "$TARGET_DIR/FLAVOR.md" \
+        '<!-- SUPERHARNESS:FLAVOR-BEGIN -->' '<!-- SUPERHARNESS:FLAVOR-END -->'; then
+        UNINSTALLED_ANYTHING=1
+    fi
+
+    if [ -f "$TARGET_DIR/.gitignore" ]; then
+        if remove_gitignore_entries "$TARGET_DIR/.gitignore" \
+            '.claude/superharness/ralph/' '.claude/superharness/brainstorm/' \
+            '.superharness/' '.flavor/superharness/ralph/'; then
+            UNINSTALLED_ANYTHING=1
+        fi
+    fi
+
+    if [ "$UNINSTALLED_ANYTHING" = "0" ]; then
+        echo "No superharness install found in $TARGET_DIR. Nothing to uninstall."
+    else
+        echo "Superharness uninstalled from $TARGET_DIR. Your other project settings were left untouched."
+    fi
+    exit 0
+fi
+
+if [ "$UNINSTALL" != "1" ] && [ ! -d "$TEMPLATE_DIR" ]; then
+    echo "Template directory not found: $TEMPLATE_DIR" >&2; exit 1
+fi
 
 if [ "$SAW_TEMPLATE" = "1" ] && [ -z "$TEMPLATE" ]; then
     echo "Error: --template requires a value. Valid: frontend, backend, fullstack." >&2; exit 1

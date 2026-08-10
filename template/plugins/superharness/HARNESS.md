@@ -22,6 +22,7 @@ the Skill tool before doing anything else.**
 | `superharness:light` | Small, focused tasks that need discipline without the full go machinery — quick fixes, small features, config/docs tweaks, prototypes. Lighter go: TDD with explicit exemptions, real-output verification, root-cause debugging; no worktree, no plan file, no ralph tracking |
 | `superharness:writing-plans` | A multi-step task needs an implementation plan, before touching code |
 | `superharness:using-git-worktrees` | Starting feature work that needs an isolated workspace, before implementation (go Phase 0.5) |
+| `superharness:finishing-a-development-branch` | Worktree/branch work is done, verified, and reviewed — merge it back, remove the worktree, delete the branch (go Phase 5) |
 | `superharness:subagent-driven-development` | Executing a multi-task plan with independent tasks in the current session (go Phase 2) |
 | `superharness:test-driven-development` | Implementing ANY feature or bugfix, before writing implementation code |
 | `superharness:systematic-debugging` | Any bug, test failure, or unexpected behavior, before proposing fixes |

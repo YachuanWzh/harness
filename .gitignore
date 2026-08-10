@@ -1,5 +1,3 @@
-# superharness 本地运行时产物
-.superharness/
 # 任务追踪 hook 的临时态（每任务的 trace .json 保留，仅忽略中间标记）
 superharness/trace/.state/
 # dogfood 安装产物（本仓库自装时生成；真正的插件源在 template/）
@@ -8,9 +6,11 @@ superharness/trace/.state/
 .claude/superharness/
 .claude/settings.json
 .claude/settings.local.json
+.flavor
+FLAVOR.md
 # superharness brainstorm mind-map session state (transient)
 .claude/superharness/brainstorm/
-.flavor
+# superharness brainstorm mind-map session state (transient)
+.superharness/
 # superharness ralph runtime state (per-task tracking + retry)
 .flavor/superharness/ralph/
-FLAVOR.md

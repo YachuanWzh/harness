@@ -108,6 +108,25 @@ superharness --template=fullstack --frontend=vue --backend=node :: 自由组合
 （API 契约、CORS、dev proxy、e2e），结果写入 `.claude\superharness\STACK.md`；
 不带 `--template` 的普通初始化不写该文件（已有的会被移除）。
 
+### 1.1 卸载项目安装
+
+在项目根目录运行：
+
+```cmd
+superharness --uninstall
+```
+
+只移除安装器自己添加的内容，其余项目配置原样保留：
+
+- 删除 `.claude\superharness\`（Claude Code）与 `.flavor\plugins\superharness\`（flavor-code）插件目录
+- 从 `.claude\settings.json` 移除 `extraKnownMarketplaces.superharness` 与
+  `enabledPlugins["superharness@superharness"]`（其他键不动）
+- 移除 `CLAUDE.md` / `FLAVOR.md` 中的 SUPERHARNESS 标记段（原有内容保留）
+- 清理 `.gitignore` 中安装器追加的运行时目录条目
+
+未安装过时安全无操作（退出 0）。全局安装（`%LOCALAPPDATA%\superharness\` 或
+`~/.local/superharness/`）不在此命令范围内，仍按上文手动步骤卸载。
+
 ### 2. 启动 Claude Code / flavor-code
 
 在该项目目录运行 `claude`（或 flavor-code 的 `flavor`；首次需在信任弹窗中信任工作区）。此后：
@@ -124,7 +143,7 @@ superharness --template=fullstack --frontend=vue --backend=node :: 自由组合
 /superharness:go 给登录接口增加验证码校验
 ```
 
-`go` 技能驱动六阶段自主工作流：
+`go` 技能驱动七阶段自主工作流：
 
 1. **理解** —— 探索代码、确认目标，必要时一轮澄清
 2. **隔离** —— `using-git-worktrees`：git 项目默认建 worktree/分支隔离，非 git 则原地，绝不阻塞
@@ -132,6 +151,7 @@ superharness --template=fullstack --frontend=vue --backend=node :: 自由组合
 4. **实现** —— 多任务计划委托 `subagent-driven-development`（每任务派新子代理，主上下文只留计划与协调），琐碎/紧耦合任务主代理内联 `test-driven-development`；均严格红-绿-重构-提交，出问题转 `systematic-debugging`
 5. **验证** —— `verification-before-completion`：跑完整测试套件，贴出真实输出
 6. **审查** —— `requesting-code-review`：派子代理审查 diff，严重问题阻塞收尾
+7. **收尾** —— `finishing-a-development-branch`：合并 worktree 分支、移除 worktree、删除分支（非 git/原地则跳过；不自动 push）
 
 ### 3.1 轻量任务（light）
 
@@ -256,6 +276,7 @@ Windows 侧 `scripts/ralph-lib.ps1`（dot-source 即用），macOS/Linux 侧 `sc
 | `superharness:brainstorm` | 本项目（流程参考 superpowers） | **仅手动** `/superharness:brainstorm`，实时脑图梳理需求设计 |
 | `superharness:writing-plans` | superpowers（适配） | 多步任务动代码之前 |
 | `superharness:using-git-worktrees` | superpowers（适配） | 动代码前需要隔离工作区（go Phase 0.5） |
+| `superharness:finishing-a-development-branch` | 本项目 | worktree/分支任务完成并验证后：合并回主干、清理隔离工作区（go Phase 5） |
 | `superharness:subagent-driven-development` | superpowers（适配） | 执行多任务计划、任务相互独立时（go Phase 2） |
 | `superharness:test-driven-development` | superpowers | 实现任何功能/修复之前 |
 | `superharness:systematic-debugging` | superpowers | 任何 bug、测试失败、异常行为 |
