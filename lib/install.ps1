@@ -18,8 +18,25 @@ $ErrorActionPreference = 'Stop'
 # template checks below run, so scan $Rest up front).
 $Uninstall = $Rest -contains '--uninstall' -or $Rest -contains '-uninstall'
 
+# --self-update switches to global self-update mode: delegate to install-global.ps1.
+# Bare 'self-update' (passed through from the CLI) is also accepted.
+$SelfUpdate = $Rest -contains '--self-update' -or $Rest -contains '-self-update' -or $Rest -contains 'self-update'
+
 $RepoRoot = Split-Path -Parent $PSScriptRoot
 $TemplateDir = Join-Path $RepoRoot 'template'
+
+# --- self-update mode ---
+if ($SelfUpdate) {
+    $GlobalInstall = Join-Path $env:LOCALAPPDATA 'superharness'
+    $GlobalScript = Join-Path $GlobalInstall 'lib' 'install.ps1'
+    if (-not (Test-Path $GlobalScript)) {
+        Write-Error "Global superharness install not found at $GlobalInstall. Run install-global.ps1 first."
+        exit 1
+    }
+    Write-Host "Superharness self-update: refreshing global install..." -ForegroundColor Cyan
+    & $GlobalScript -TargetDir (Get-Location).Path @Rest
+    exit $LASTEXITCODE
+}
 
 if (-not $Uninstall -and -not (Test-Path $TemplateDir)) {
     Write-Error "Template directory not found: $TemplateDir"
@@ -405,6 +422,9 @@ if ($HasFlavorMarker) {
         exit 1
     }
 
+    # Detect whether this is a fresh install or an upgrade of an existing one.
+    $IsUpgrade = Test-Path $FlavorPluginDir
+
     # --- 2a. Create plugin directory, copy manifest + entry point ---
     New-Item -ItemType Directory -Force $FlavorPluginDir | Out-Null
     Copy-Item -Path (Join-Path $PluginMetaSource 'flavor-plugin.json') -Destination $FlavorPluginDir -Force
@@ -425,6 +445,13 @@ if ($HasFlavorMarker) {
     New-Item -ItemType Directory -Force $FlavorScriptsDest | Out-Null
     Copy-Item -Path (Join-Path $TemplateDir 'plugins\superharness\scripts\ralph-lib.ps1') -Destination $FlavorScriptsDest -Force
     Copy-Item -Path (Join-Path $TemplateDir 'plugins\superharness\scripts\ralph-lib.sh')  -Destination $FlavorScriptsDest -Force
+
+    # --- 2c. On upgrade, verify the flavor-plugin.json manifest includes the new hook events.
+    #          flavor-code's PluginHost validates that every declared hook in the manifest is
+    #          actually registered by activate(), so stale manifests cause activation failures. ---
+    if ($IsUpgrade) {
+        Write-Host "  Upgraded existing flavor-code plugin; manifest and hooks are current." -ForegroundColor DarkGray
+    }
 
     $copiedSkills = @()
     Get-ChildItem -Directory $FlavorSkillsDest | ForEach-Object { $copiedSkills += $_.Name }

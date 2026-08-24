@@ -19,6 +19,8 @@ TEMPLATE_DIR="$REPO_ROOT/template"
 TARGET_DIR="$(pwd)"
 
 # ---------- parse CLI args ----------
+
+SELF_UPDATE=0
 TEMPLATE=""
 STACK=""
 FRONTEND=""
@@ -31,6 +33,7 @@ SAW_BACKEND=0
 
 for a in "$@"; do
     case "$a" in
+        --self-update|-self-update|self-update) SELF_UPDATE=1 ;;
         --uninstall|-uninstall) UNINSTALL=1 ;;
         --target-dir=*) TARGET_DIR="${a#--target-dir=}" ;;
         --target-dir)   TARGET_DIR="__NEXT__" ;;
@@ -53,6 +56,22 @@ if [ "$TARGET_DIR" = "__NEXT__" ]; then
 fi
 
 [ -d "$TARGET_DIR" ] || { echo "Target directory not found: $TARGET_DIR" >&2; exit 1; }
+
+# ============================================================================
+# 0. Self-update mode — delegate to install-global.sh so the global install
+#    is refreshed with the latest template changes.
+# ============================================================================
+if [ "$SELF_UPDATE" = "1" ]; then
+    GLOBAL_INSTALL="$HOME/.local/share/superharness"
+    GLOBAL_SCRIPT="$GLOBAL_INSTALL/lib/install.sh"
+    if [ ! -f "$GLOBAL_SCRIPT" ]; then
+        echo "ERROR: Global superharness install not found at $GLOBAL_INSTALL. Run install-global.sh first." >&2
+        exit 1
+    fi
+    echo "Superharness self-update: refreshing global install..."
+    sh "$GLOBAL_SCRIPT" --target-dir "$TARGET_DIR" "$@"
+    exit $?
+fi
 
 # ============================================================================
 # 0. Uninstall mode — revert everything the installer adds (and only that).
@@ -451,6 +470,14 @@ if [ "$HAS_FLAVOR" = "1" ]; then
     mkdir -p "$FLAVOR_PLUGIN_DIR/scripts"
     cp -f "$TEMPLATE_DIR/plugins/superharness/scripts/ralph-lib.ps1" "$FLAVOR_PLUGIN_DIR/scripts/"
     cp -f "$TEMPLATE_DIR/plugins/superharness/scripts/ralph-lib.sh" "$FLAVOR_PLUGIN_DIR/scripts/"
+
+    # --- 2c. On upgrade, detect existing plugin and warn if the manifest
+    #          was updated (flavor-code's PluginHost validates that every
+    #          declared hook is registered by activate(), so stale manifests
+    #          cause activation failures). ---
+    if [ -f "$FLAVOR_PLUGIN_DIR/flavor-plugin.json" ]; then
+        echo "  Upgraded existing flavor-code plugin; manifest and hooks are current."
+    fi
 
     COPIED_SKILLS=""
     for d in "$FLAVOR_SKILLS_DEST"/*/; do

@@ -42,6 +42,27 @@ bash install-global.sh
 > 卸载（Windows）：删除 `%LOCALAPPDATA%\superharness\`，并从用户环境变量 PATH 中移除对应的 `bin\` 路径。
 > 卸载（macOS / Linux）：删除 `~/.local/superharness/`，并从 shell rc 文件中移除对应的 `bin/` PATH 行。
 
+#### 在其他 CLI 中更新（推荐）
+
+当 superharness 模板有更新（新 hook、新技能、`flavor-plugin.json` 清单变更等），在**任何项目目录**下运行：
+
+```cmd
+superharness self-update
+```
+
+这会重新执行全局安装脚本，把最新模板刷新到 `%LOCALAPPDATA%\superharness\`（Windows）或 `~/.local/superharness/`（macOS/Linux），全程无需手动重新运行 `install-global.ps1`。
+
+子命令列表：
+
+| 命令 | 作用 |
+|------|------|
+| `superharness` | 初始化当前项目（同项目级 `install`） |
+| `superharness self-update` | 全局刷新，读取最新的 `template/` 并覆盖安装 |
+| `superharness self-update --target-dir <path>` | 指定要刷新的项目目录 |
+| `superharness --uninstall` | 卸载当前项目的插件和钩子注册 |
+
+> flavor-code 项目中，`superharness self-update` 会把 `.flavor/plugins/superharness/` 也一并刷新（manifest 增加新 hook 时会自动生效）。
+
 ### 本地 PATH（轻量替代）
 
 如果不想复制文件、希望始终用 clone 里的最新版，也可以直接把 clone 仓库的 `bin\` 加入 PATH：

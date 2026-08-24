@@ -6,6 +6,7 @@
 # Usage: powershell -NoProfile -ExecutionPolicy Bypass -File install-global.ps1
 #
 # Update:  re-run this script from an updated clone to refresh the global install.
+#          Or run `superharness self-update` from any project directory for the same effect.
 # Remove:  delete %LOCALAPPDATA%\superharness\ and remove its bin\ from user PATH.
 
 $ErrorActionPreference = 'Stop'

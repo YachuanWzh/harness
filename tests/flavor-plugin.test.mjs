@@ -82,10 +82,15 @@ async function activateInstalled(pluginRoot) {
   return { host, mod, deactivate };
 }
 
-test('manifest declares exactly the three superharness hooks with valid names', () => {
+test('manifest declares all superharness hooks with valid names', () => {
   const manifest = JSON.parse(fs.readFileSync(path.join(TEMPLATE, 'plugin', 'flavor-plugin.json'), 'utf8'));
   const names = manifest.contributes.hooks.map(h => h.name);
-  assert.deepEqual([...names].sort(), ['SessionStart', 'Stop', 'UserPromptSubmit']);
+  const expected = [
+    'BeforePlan', 'AfterPlan', 'SessionEnd', 'SessionStart',
+    'Stop', 'SubagentStart', 'SubagentStop', 'UserPromptSubmit',
+  ];
+  assert.equal(names.length, expected.length);
+  for (const name of expected) assert.ok(names.includes(name), `missing hook ${name}`);
   for (const name of names) assert.ok(HOOK_EVENT_NAMES.includes(name), `${name} must be a flavor-code HOOK_EVENT_NAME`);
 });
 
@@ -93,7 +98,9 @@ test('activate() registers every declared hook and the skill root (host consiste
   const root = installFlavorPlugin();
   try {
     const { host, deactivate } = await activateInstalled(root);
-    assert.deepEqual([...host.registered.hook.keys()].sort(), ['SessionStart', 'Stop', 'UserPromptSubmit'],
+    const registered = [...host.registered.hook.keys()].sort();
+    const expected = ['BeforePlan', 'AfterPlan', 'SessionEnd', 'SessionStart', 'Stop', 'SubagentStart', 'SubagentStop', 'UserPromptSubmit'].sort();
+    assert.deepEqual(registered, expected,
       'every declared hook must be registered (host rejects partial registration)');
     assert.equal(host.registered.skillRoot.get('superharness'), './skills');
     for (const { options } of host.registered.hook.values()) {
@@ -198,6 +205,60 @@ test('Stop without an active task is a no-op allow; hooks never throw on malform
       assertHookDecision(await handler.handler(undefined, signal));
       assertHookDecision(await handler.handler({ version: 1, type: 'UserPromptSubmit', payload: { prompt: 42 } }, signal));
     }
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+    fs.rmSync(workspace, { recursive: true, force: true });
+  }
+});
+
+// New hooks: SessionEnd, BeforePlan, AfterPlan, SubagentStart, SubagentStop
+// are no-ops when no active go task is running; they return allow.
+test('SessionEnd / BeforePlan / AfterPlan / SubagentStart / SubagentStop are no-ops without active task', async () => {
+  const root = installFlavorPlugin();
+  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'sh-flavor-ws-'));
+  try {
+    const { host } = await activateInstalled(root);
+    const signal = new AbortController().signal;
+    await host.registered.hook.get('SessionStart').handler({ version: 1, type: 'SessionStart', payload: { workspace } }, signal);
+
+    const noopHooks = ['SessionEnd', 'BeforePlan', 'AfterPlan', 'SubagentStart', 'SubagentStop'];
+    for (const name of noopHooks) {
+      const { handler } = host.registered.hook.get(name);
+      const decision = await handler({ version: 1, type: name, payload: {} }, signal);
+      assertHookDecision(decision);
+      assert.equal(decision.decision, 'allow');
+      assert.equal(decision.additionalContext, undefined);
+    }
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+    fs.rmSync(workspace, { recursive: true, force: true });
+  }
+});
+
+test('SessionEnd clears the active-task pointer and records session:end trace', async () => {
+  const root = installFlavorPlugin();
+  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'sh-flavor-ws-'));
+  try {
+    const { host } = await activateInstalled(root);
+    const signal = new AbortController().signal;
+    const sessionStart = host.registered.hook.get('SessionStart').handler;
+    const userPrompt = host.registered.hook.get('UserPromptSubmit').handler;
+    const sessionEnd = host.registered.hook.get('SessionEnd').handler;
+
+    assertHookDecision(await sessionStart({ version: 1, type: 'SessionStart', payload: { workspace } }, signal));
+    // bootstrap a go task so ralph state exists
+    assertHookDecision(await userPrompt({ version: 1, type: 'UserPromptSubmit', payload: { prompt: '/go demo task' } }, signal));
+    assert.ok(fs.existsSync(path.join(workspace, '.flavor', 'superharness', 'ralph', 'trace.jsonl')), 'trace exists before SessionEnd');
+
+    assertHookDecision(await sessionEnd({ version: 1, type: 'SessionEnd', payload: {} }, signal));
+
+    // active-task pointer is cleared
+    assert.ok(!fs.existsSync(path.join(workspace, '.flavor', 'superharness', 'ralph', '.current-task')),
+      'active-task pointer cleared by SessionEnd');
+
+    // trace.jsonl contains session:end entry
+    const trace = fs.readFileSync(path.join(workspace, '.flavor', 'superharness', 'ralph', 'trace.jsonl'), 'utf8');
+    assert.match(trace, /"event":"session:end"/);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
     fs.rmSync(workspace, { recursive: true, force: true });

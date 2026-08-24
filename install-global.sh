@@ -7,6 +7,7 @@
 # Usage: bash install-global.sh
 #
 # Update:  re-run this script from an updated clone to refresh the global install.
+#          Or run `superharness self-update` from any project directory for the same effect.
 # Remove:  delete ~/.local/superharness/ and remove its bin/ from your shell rc.
 
 set -euo pipefail
