@@ -20,7 +20,7 @@ const HOOK_EVENT_NAMES = [
   'BeforePlan', 'AfterPlan', 'SubagentStart', 'SubagentStop',
   'BeforeModelCall', 'AfterModelCall', 'PreToolUse', 'PermissionRequest',
   'PostToolUse', 'PostToolUseFailure', 'PreCompact', 'PostCompact',
-  'PluginLoad', 'PluginUnload', 'Notification',
+  'PluginLoad', 'PluginUnload', 'Notification', 'LoopEnd',
 ];
 
 const DECISIONS = ['allow', 'deny', 'ask'];
@@ -235,7 +235,7 @@ test('SessionEnd / BeforePlan / AfterPlan / SubagentStart / SubagentStop are no-
   }
 });
 
-test('SessionEnd clears the active-task pointer and records session:end trace', async () => {
+test('SessionEnd preserves the active-task pointer for cold resume and records session:end trace', async () => {
   const root = installFlavorPlugin();
   const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'sh-flavor-ws-'));
   try {
@@ -252,13 +252,33 @@ test('SessionEnd clears the active-task pointer and records session:end trace', 
 
     assertHookDecision(await sessionEnd({ version: 1, type: 'SessionEnd', payload: {} }, signal));
 
-    // active-task pointer is cleared
-    assert.ok(!fs.existsSync(path.join(workspace, '.flavor', 'superharness', 'ralph', '.current-task')),
-      'active-task pointer cleared by SessionEnd');
+    // Ending the host session is only a checkpoint; the go task remains resumable.
+    assert.ok(fs.existsSync(path.join(workspace, '.flavor', 'superharness', 'ralph', '.current-task')),
+      'active-task pointer preserved by SessionEnd');
 
     // trace.jsonl contains session:end entry
     const trace = fs.readFileSync(path.join(workspace, '.flavor', 'superharness', 'ralph', 'trace.jsonl'), 'utf8');
     assert.match(trace, /"event":"session:end"/);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+    fs.rmSync(workspace, { recursive: true, force: true });
+  }
+});
+
+test('SubagentStop records flavor-code status and error payloads', async () => {
+  const root = installFlavorPlugin();
+  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'sh-flavor-ws-'));
+  try {
+    const { host } = await activateInstalled(root);
+    const signal = new AbortController().signal;
+    await host.registered.hook.get('SessionStart').handler({ version: 1, type: 'SessionStart', payload: { workspace } }, signal);
+    await host.registered.hook.get('UserPromptSubmit').handler({ version: 1, type: 'UserPromptSubmit', payload: { prompt: '/go demo task' } }, signal);
+    await host.registered.hook.get('SubagentStop').handler({
+      version: 1, type: 'SubagentStop', payload: { taskId: 'review', status: 'failed', error: 'tests red' },
+    }, signal);
+
+    const trace = fs.readFileSync(path.join(workspace, '.flavor', 'superharness', 'ralph', 'trace.jsonl'), 'utf8');
+    assert.match(trace, /subagent failed: tests red/);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
     fs.rmSync(workspace, { recursive: true, force: true });

@@ -38,10 +38,11 @@ No verified lint or format command detected.
 ## Superharness
 
 This project has **superharness** installed as a flavor-code plugin under
-`.flavor/plugins/superharness/`. It registers a skill root that provides
-engineering-discipline skills for autonomous development, plus SessionStart /
-UserPromptSubmit / Stop hooks that inject `HARNESS.md` into every session and
-track `/go` tasks under `.flavor/superharness/ralph/`.
+`.flavor/plugins/superharness/`. It registers a skill root plus eight session,
+planning, and subagent lifecycle hooks. On flavor-code 1.2.20+, SessionStart
+injects `HARNESS.md` into the persistent context and the host `Skill` tool loads
+required sub-skills during `/go`. Ralph checkpoints live under
+`.flavor/superharness/ralph/` and remain resumable across host sessions.
 
 Installed skills: `brainstorm`, `finishing-a-development-branch`, `go`, `light`, `requesting-code-review`, `subagent-driven-development`, `systematic-debugging`, `test-driven-development`, `using-git-worktrees`, `verification-before-completion`, `writing-plans`
 

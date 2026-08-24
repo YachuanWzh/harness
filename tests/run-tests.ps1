@@ -153,7 +153,7 @@ Assert-True ($harnessDoc -notmatch 'skills-dir') "HARNESS.md no longer mentions 
 Assert-True ($harnessDoc -match 'superharness:brainstorm') "HARNESS.md lists the brainstorm skill"
 
 $pj = Get-Content (Join-Path (Get-PluginDir $proj4) '.claude-plugin\plugin.json') -Raw | ConvertFrom-Json
-Assert-True ($pj.version -eq '2.1.0') "plugin.json version bumped to 2.1.0"
+Assert-True ($pj.version -eq '2.2.0') "plugin.json version bumped to 2.2.0"
 
 # ---------------------------------------------------------------- Test group 2: skills
 Write-Host "`n[2] Installer copies the go skill and the core engineering skills"
@@ -204,7 +204,7 @@ Assert-True ($light -match '(?i)verification-before-completion|real output|çœŸå®
 Assert-True ($light -match 'superharness:systematic-debugging') "light skill keeps root-cause debugging"
 Assert-True ($light -match 'superharness:go') "light skill points heavy tasks back to go"
 Assert-True ($light -notmatch '\.claude/superharness/plans/') "light skill does not write plan files"
-Assert-True ($light -notmatch '(?i)subagent') "light skill never dispatches subagents"
+Assert-True ($light -match '(?i)no subagent dispatch' -and $light -notmatch '(?i)(dispatch|spawn|delegate).{0,24}(a |one |fresh )?subagent') "light skill explicitly forbids subagent dispatch"
 Assert-True ($light -notmatch 'Start-RalphTask|Set-RalphCurrentTask|Add-RalphTrace|Initialize-RalphTasks') "light skill does not drive ralph tracking"
 Assert-True ($harnessDoc2 -match 'superharness:light') "HARNESS.md lists the light skill"
 

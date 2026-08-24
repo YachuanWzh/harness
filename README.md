@@ -10,7 +10,8 @@
 `.claude/settings.json` 中通过 `extraKnownMarketplaces` + `enabledPlugins` 自动启用——
 信任项目目录后即获得 `/superharness:*` 命名空间技能与 SessionStart 钩子。
 flavor-code 项目（`FLAVOR.md` / `.flavor` 标记）则安装为 `.flavor/plugins/superharness/`
-原生插件，同时注册 SessionStart / UserPromptSubmit / Stop 钩子，行为与 Claude Code 侧对齐。
+原生插件，注册 8 个会话、计划和子代理生命周期钩子。flavor-code 1.2.20+ 还提供组合 `Skill`
+工具与 Claude 风格参数展开，使 `go` 的必需子技能链和 SessionStart 规则注入真正按宿主协议执行。
 
 支持 **Windows**（PowerShell）与 **macOS / Linux**（bash）双平台，两套实现功能等价。
 
@@ -102,7 +103,7 @@ flavor-code 侧会创建：
 
 | 产物 | 作用 |
 |------|------|
-| `.flavor/plugins/superharness/` | 插件本体：`flavor-plugin.json`（清单，声明三个钩子）+ `index.js`（注册 skillRoot 与钩子）+ `skills/` + `scripts/ralph-lib.*` + `HARNESS.md` |
+| `.flavor/plugins/superharness/` | 插件本体：`flavor-plugin.json`（清单，声明 8 个生命周期钩子）+ `index.js`（注册 skillRoot 与钩子）+ `skills/` + `scripts/ralph-lib.*` + `HARNESS.md` |
 | `FLAVOR.md` 中的 SUPERHARNESS 标记段 | flavor-code 自动读取的兜底指引（同样保留性合并、幂等） |
 | 目标项目 `.gitignore` | 追加运行时态目录（flavor-code 侧为 `.flavor/superharness/ralph/`，Claude Code 侧为 `.claude/superharness/ralph/` 等） |
 
@@ -153,10 +154,13 @@ superharness --uninstall
 在该项目目录运行 `claude`（或 flavor-code 的 `flavor`；首次需在信任弹窗中信任工作区）。此后：
 
 - Claude Code：插件经 `.claude/superharness` 本地 marketplace 自动加载 —— 无需任何安装命令；
-- flavor-code：插件经 `.flavor/plugins/superharness/` 自动加载，启动时注册 skillRoot 与三个钩子；
+- flavor-code：插件经 `.flavor/plugins/superharness/` 自动加载，启动时注册 skillRoot 与 8 个生命周期钩子；
 - 两侧的 **SessionStart 钩子**都会自动把 `HARNESS.md`（约束规则）注入每个会话上下文；
 - 各技能以 `/superharness:*` 命名空间注册（flavor-code 侧无前缀，直接 `/go` 等）。`go` 等会按 description 自动触发；
   `brainstorm` 设了 `disable-model-invocation`，仅在你手动运行时启动。
+
+> flavor-code 完整兼容要求 **1.2.20+**。旧版仍能发现并显式运行单个 Skill，但不会展开
+> `$ARGUMENTS`，也无法在 `/go` 运行中继续加载必需子 Skill，SessionStart 返回的完整规则上下文也不会生效。
 
 ### 3. 执行任务
 
@@ -321,7 +325,7 @@ superharness\
 │       ├── hooks\session-start.ps1|.sh   # 注入 HARNESS.md 的钩子（双平台）
 │       ├── hooks\user-prompt-submit.ps1|.sh  # go 调用自动起跑 + 暂存每轮 query（双平台）
 │       ├── hooks\stop.ps1|.sh            # 向 trace.jsonl 追加 round 心跳的钩子（双平台）
-│       ├── plugin\flavor-plugin.json     # flavor-code 插件清单（声明三个钩子）
+│       ├── plugin\flavor-plugin.json     # flavor-code 插件清单（声明 8 个生命周期钩子）
 │       ├── plugin\index.js               # flavor-code 插件入口（registerHook + skillRoot）
 │       ├── scripts\ralph-lib.ps1|.sh     # Ralph 状态库（go 跟踪 + 重试，钩子引用它；双平台）
 │       └── skills\...                    # go + light + brainstorm + using-git-worktrees + subagent-driven-development + 5 个核心技能
@@ -355,7 +359,8 @@ Node 套件覆盖：脑图树布局（确定性、无重叠、左右分布）、
 事件落盘、WebSocket 快照推送与文件监听、空闲自动退出、节点编辑协议（node:edit/submit 分流
 至 state/edits、乐观更新清空时机、编辑面板 UI 就位）、flavor 插件钩子（模拟 flavor-code
 HookBus 驱动 `index.js`：清单声明与注册一致性、SessionStart 注入 HARNESS.md/STACK.md、
-UserPromptSubmit 对 `/go` 自动 bootstrap ralph 状态、Stop 心跳与非法事件容错）。
+UserPromptSubmit 对 `/go` 自动 bootstrap ralph 状态、Stop 心跳、SessionEnd 续跑指针保留、
+SubagentStop 真实状态载荷与非法事件容错）。
 
 修改 `template\` 后无需重新安装本仓库——下次在项目里运行 `superharness` 即覆盖更新（安装器会
 把插件 `version` 写为当前模板版本，确保 Claude Code 重新拉取缓存）；已初始化项目中改动插件文件后，
