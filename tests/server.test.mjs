@@ -241,3 +241,11 @@ test('optimistic edits clear on authoritative snapshot, not on submit', async t 
     html.indexOf("submitBtn.addEventListener") + 400);
   assert.doesNotMatch(submitBlock, /delete pendingEdits/);
 });
+
+test('mind map page colors the onboarding node kinds (module/flow/entity)', async t => {
+  const { info } = await startServer(t);
+  const html = await (await fetch(info.url + '/')).text();
+  assert.match(html, /module:\s*'#/, 'KIND_COLORS must include module');
+  assert.match(html, /flow:\s*'#/, 'KIND_COLORS must include flow');
+  assert.match(html, /entity:\s*'#/, 'KIND_COLORS must include entity');
+});
