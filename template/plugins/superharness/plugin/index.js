@@ -9,7 +9,7 @@
 //   SubagentStart/Stop record child lifecycle and real completion status
 // All hooks are best-effort and always return { decision: "allow" }.
 
-import { appendFileSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -119,6 +119,13 @@ function onSessionStart(event) {
   const stack = readText(join(PLUGIN_ROOT, "STACK.md"));
   if (stack !== undefined) {
     context += `\n\n<EXTREMELY_IMPORTANT>\nThis project targets a specific tech stack. Follow this guidance.\n\n${stack}\n</EXTREMELY_IMPORTANT>`;
+  }
+  // One-line onboarding nudge when the workspace has neither the generated
+  // doc nor an analysis cache. Never auto-analyze; the skill is manual-only.
+  if (typeof workspace === "string" && workspace.length > 0
+      && !existsSync(join(workspace, "ONBOARDING.md"))
+      && !existsSync(join(workspace, ".flavor", "superharness", "onboarding", "cache.json"))) {
+    context += `\n\n<superharness-onboarding-hint>\n本工作区尚无新人上手文档。运行 /onboarding 可分析代码库、梳理模块业务关联并生成 ONBOARDING.md 与交互式模块导图。\n</superharness-onboarding-hint>`;
   }
   return { decision: "allow", additionalContext: context };
 }

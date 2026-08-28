@@ -138,11 +138,62 @@ test('SessionStart appends STACK.md guidance when present', async () => {
   try {
     const { host } = await activateInstalled(root);
     const { handler } = host.registered.hook.get('SessionStart');
-    const decision = await handler({ version: 1, type: 'SessionStart', payload: { workspace: root } }, new AbortController().signal);
+    const decision = await handler({ version: 1, type: 'SessionStart', payload: { workspace: root } }, signal0());
     assertHookDecision(decision);
     assert.match(decision.additionalContext, /Vue/);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+function signal0() { return new AbortController().signal; }
+
+test('SessionStart hints /onboarding when the workspace has no onboarding doc or cache', async () => {
+  const root = installFlavorPlugin();
+  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'sh-flavor-ws-'));
+  try {
+    const { host } = await activateInstalled(root);
+    const { handler } = host.registered.hook.get('SessionStart');
+    const decision = await handler({ version: 1, type: 'SessionStart', payload: { workspace } }, signal0());
+    assertHookDecision(decision);
+    assert.match(decision.additionalContext, /尚无新人上手文档[\s\S]*\/onboarding/, 'missing docs: hint the one-line /onboarding command');
+    assert.ok(!/自动|automatically run/i.test(decision.additionalContext), 'hint must not promise auto analysis');
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+    fs.rmSync(workspace, { recursive: true, force: true });
+  }
+});
+
+test('SessionStart stays silent when ONBOARDING.md exists', async () => {
+  const root = installFlavorPlugin();
+  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'sh-flavor-ws-'));
+  try {
+    fs.writeFileSync(path.join(workspace, 'ONBOARDING.md'), '# guide\n');
+    const { host } = await activateInstalled(root);
+    const { handler } = host.registered.hook.get('SessionStart');
+    const decision = await handler({ version: 1, type: 'SessionStart', payload: { workspace } }, signal0());
+    assertHookDecision(decision);
+    assert.ok(!/尚无新人上手文档/.test(decision.additionalContext), 'docs present: no hint');
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+    fs.rmSync(workspace, { recursive: true, force: true });
+  }
+});
+
+test('SessionStart stays silent when the onboarding cache exists but docs were not committed yet', async () => {
+  const root = installFlavorPlugin();
+  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'sh-flavor-ws-'));
+  try {
+    fs.mkdirSync(path.join(workspace, '.flavor', 'superharness', 'onboarding'), { recursive: true });
+    fs.writeFileSync(path.join(workspace, '.flavor', 'superharness', 'onboarding', 'cache.json'), '{}');
+    const { host } = await activateInstalled(root);
+    const { handler } = host.registered.hook.get('SessionStart');
+    const decision = await handler({ version: 1, type: 'SessionStart', payload: { workspace } }, signal0());
+    assertHookDecision(decision);
+    assert.ok(!/尚无新人上手文档/.test(decision.additionalContext), 'cache present: no hint');
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+    fs.rmSync(workspace, { recursive: true, force: true });
   }
 });
 
