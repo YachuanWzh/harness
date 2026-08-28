@@ -16,6 +16,8 @@ FLAVOR.md
 .flavor/superharness/ralph/
 # superharness worktree isolation dirs
 .worktrees/
+# generated Flavor plugin release directories and archives
+release/
 # superharness onboarding analysis cache (regenerable, never committed)
 .claude/superharness/onboarding/
 # superharness onboarding analysis cache (regenerable, never committed)
