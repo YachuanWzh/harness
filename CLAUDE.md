@@ -17,8 +17,6 @@ engineering work.
   `/superharness:light <task goal>`
 - Brainstorm with a live browser mind map (manual trigger only):
   `/superharness:brainstorm <topic>`
-- Onboard a newcomer / understand the codebase's business logic:
-  `/superharness:onboarding [module or flow]`
 - Non-negotiable: strict TDD (failing test first), systematic debugging, and
   verification with real command output before claiming anything is done.
 <!-- SUPERHARNESS:END -->
