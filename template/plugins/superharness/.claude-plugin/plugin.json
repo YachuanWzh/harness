@@ -1,7 +1,7 @@
 {
   "name": "superharness",
-  "description": "Project-level autonomous engineering harness: TDD-first workflow, systematic debugging, planning and verification skills. Invoke /superharness:go <goal> for end-to-end tasks, /superharness:light <goal> for small focused changes, and /superharness:brainstorm <topic> for a live mind map.",
-  "version": "2.2.0",
+  "description": "Project-level autonomous engineering harness: TDD-first workflow, systematic debugging, planning and verification skills. Invoke /superharness:go <goal> for end-to-end tasks, /superharness:light <goal> for small focused changes, /superharness:brainstorm <topic> for a live mind map, and /superharness:onboarding to analyze the codebase's business logic for newcomer onboarding.",
+  "version": "2.3.0",
   "author": {
     "name": "wangzh"
   },

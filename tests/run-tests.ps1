@@ -153,7 +153,7 @@ Assert-True ($harnessDoc -notmatch 'skills-dir') "HARNESS.md no longer mentions 
 Assert-True ($harnessDoc -match 'superharness:brainstorm') "HARNESS.md lists the brainstorm skill"
 
 $pj = Get-Content (Join-Path (Get-PluginDir $proj4) '.claude-plugin\plugin.json') -Raw | ConvertFrom-Json
-Assert-True ($pj.version -eq '2.2.0') "plugin.json version bumped to 2.2.0"
+Assert-True ($pj.version -eq '2.3.0') "plugin.json version bumped to 2.3.0"
 
 # ---------------------------------------------------------------- Test group 2: skills
 Write-Host "`n[2] Installer copies the go skill and the core engineering skills"
@@ -912,6 +912,33 @@ Assert-True ($sh24 -match 'superharness-onboarding-hint') "session-start.sh carr
 Assert-True ($sh24 -match 'ONBOARDING\.md') "session-start.sh checks for ONBOARDING.md"
 
 Remove-Item $wn24, $wn24c -Recurse -Force -ErrorAction SilentlyContinue
+
+# ---------------------------------------------------------------- Test group 25: onboarding skill wiring
+Write-Host "`n[25] onboarding skill ships and is wired into HARNESS.md"
+
+$onbPath = Join-Path $plugin 'skills\onboarding\SKILL.md'
+Assert-True (Test-Path $onbPath) "ships skills/onboarding/SKILL.md"
+$onb = if (Test-Path $onbPath) { Get-Content $onbPath -Raw } else { '' }
+Assert-True ($onb -match '\$ARGUMENTS') "onboarding skill consumes focus via `$ARGUMENTS"
+Assert-True ($onb -match 'astgraph') "onboarding skill integrates astgraph"
+Assert-True ($onb -match '(?i)fallback') "onboarding skill defines the mandatory fallback engine"
+Assert-True ($onb -match '/ast init') "onboarding skill hints /ast init when the graph index is missing"
+Assert-True ($onb -match 'ONBOARDING\.md') "onboarding skill writes ONBOARDING.md"
+Assert-True ($onb -match 'docs/onboarding/') "onboarding skill writes per-topic docs"
+Assert-True ($onb -match 'cache\.json') "onboarding skill uses the state-root cache"
+Assert-True ($onb -match '(?i)never modify source|read-only|no source edits') "onboarding skill forbids source edits"
+Assert-True (Test-Path (Join-Path $plugin 'skills\onboarding\scripts\onboarding-lib.cjs')) "ships onboarding-lib.cjs"
+
+$harnessDoc25 = Get-Content (Join-Path $plugin 'HARNESS.md') -Raw
+Assert-True ($harnessDoc25 -match 'superharness:onboarding') "HARNESS.md lists the onboarding skill"
+
+# installer docs lists the capability (FLAVOR.md section text lives in install.sh/ps1 templates)
+$flavorTpl = Get-Content (Join-Path $RepoRoot 'lib\install.ps1') -Raw
+Assert-True ($flavorTpl -match '\*\*onboarding\*\*') "install.ps1 FLAVOR.md template lists onboarding capability"
+$shTpl = Get-Content (Join-Path $RepoRoot 'lib\install.sh') -Raw
+Assert-True ($shTpl -match '\*\*onboarding\*\*') "install.sh FLAVOR.md template lists onboarding capability"
+$claudeTpl = Get-Content (Join-Path $RepoRoot 'lib\install.ps1') -Raw
+Assert-True ($claudeTpl -match '/superharness:onboarding|onboarding') "install.ps1 CLAUDE.md/usage text mentions onboarding"
 
 # ---------------------------------------------------------------- cleanup + summary
 Remove-Item $proj, $proj2, $proj3, $proj4, $emptyDir -Recurse -Force -ErrorAction SilentlyContinue
