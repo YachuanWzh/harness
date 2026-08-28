@@ -106,6 +106,16 @@ test('staleCheck flags flows whose anchor file was deleted', () => {
   assert.deepEqual(r.stale, ['flow:install']);
 });
 
+test('staleCheck flags flows whose generated doc was deleted', () => {
+  const c = {
+    modules: {},
+    flows: { login: { doc: 'docs/onboarding/login-flow.md', anchors: ['lib/a.ps1#X'] } },
+  };
+  const exists = new Set(['lib/a.ps1']);
+  const r = staleCheck(c, { fileExists: (p) => exists.has(p) });
+  assert.deepEqual(r.stale, ['flow:login']);
+});
+
 test('staleCheck on an empty cache reports nothing stale', () => {
   const r = staleCheck({ modules: {}, flows: {} }, { fileExists: () => false });
   assert.deepEqual(r.stale, []);

@@ -41,10 +41,10 @@ function moduleOwnsFile(module, file) {
 // changedFiles: workspace-relative paths (git diff --name-only HEAD <hash> etc.)
 function planRefresh({ cache, headHash, changedFiles = [] } = {}) {
   if (!cache || !cache.modules) {
-    return { full: true, headHash, changed: [], removed: [] };
+    return { full: true, headHash, changed: [] };
   }
   if (cache.gitHash === headHash && changedFiles.length === 0) {
-    return { full: false, headHash, changed: [], removed: [] };
+    return { full: false, headHash, changed: [] };
   }
   const changed = new Set();
   for (const file of changedFiles) {
@@ -52,7 +52,7 @@ function planRefresh({ cache, headHash, changedFiles = [] } = {}) {
       if (moduleOwnsFile(module, file)) changed.add(id);
     }
   }
-  return { full: false, headHash, changed: [...changed], removed: [] };
+  return { full: false, headHash, changed: [...changed] };
 }
 
 // Walk cached docs and flow anchors; anything the fileExists probe rejects is
@@ -66,6 +66,7 @@ function staleCheck(cache, { fileExists } = {}) {
     if (m && typeof m.doc === 'string' && !exists(m.doc)) stale.push(id);
   }
   for (const [id, f] of Object.entries(flows)) {
+    if (f && typeof f.doc === 'string' && !exists(f.doc)) { stale.push(STALE_PREFIX + id); continue; }
     const anchors = (f && f.anchors) || [];
     const broken = anchors.some((a) => {
       const file = String(a).split('#')[0];

@@ -173,6 +173,7 @@ test('SessionStart stays silent when ONBOARDING.md exists', async () => {
     const { handler } = host.registered.hook.get('SessionStart');
     const decision = await handler({ version: 1, type: 'SessionStart', payload: { workspace } }, signal0());
     assertHookDecision(decision);
+    assert.match(decision.additionalContext, /superharness/, 'docs case still injects harness (non-vacuous)');
     assert.ok(!/<superharness-onboarding-hint>/.test(decision.additionalContext), 'docs present: no hint');
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
@@ -190,6 +191,7 @@ test('SessionStart stays silent when the onboarding cache exists but docs were n
     const { handler } = host.registered.hook.get('SessionStart');
     const decision = await handler({ version: 1, type: 'SessionStart', payload: { workspace } }, signal0());
     assertHookDecision(decision);
+    assert.match(decision.additionalContext, /superharness/, 'cache case still injects harness (non-vacuous)');
     assert.ok(!/<superharness-onboarding-hint>/.test(decision.additionalContext), 'cache present: no hint');
   } finally {
     fs.rmSync(root, { recursive: true, force: true });

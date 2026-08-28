@@ -17,10 +17,15 @@ mind map in the browser. The analysis is **layered** (overview → drill-down) a
 done by you (the agent); mechanical graph work is delegated to the astgraph
 plugin when available, with a mandatory fallback when it is not.
 
-**State root:** the superharness state root follows the host — `.claude/superharness/`
-under Claude Code, `.flavor/superharness/` under flavor-code. Everywhere below,
-`.claude/superharness/` stands for whichever state root applies (the onboarding
-cache lives at `<state-root>/superharness/onboarding/`).
+**Cache path (exact, per host — do not double-nest):** the SessionStart hooks
+and incremental runs all key off ONE file per host:
+
+- Claude Code: `.claude/superharness/onboarding/cache.json`
+- flavor-code: `.flavor/superharness/onboarding/cache.json`
+
+(the directory above the filename is referred to as the onboarding cache dir
+below). Both are gitignored by the superharness installers. Generated docs
+(`ONBOARDING.md`, `docs/onboarding/`) are committed repo files; the cache is not.
 
 <HARD-GATE>
 Never modify source files. This skill only reads code and writes: the
@@ -31,10 +36,13 @@ and mind-map snapshots. Do not refactor, fix, or "improve" the analyzed code.
 ## Phase 0 — Engine detection (never blocks on astgraph)
 
 1. Determine the workspace root and state root.
-2. Decide the analysis engine — use the deterministic helper:
+2. Decide the analysis engine — pipe a JSON object with booleans
+   `astToolsAvailable` / `indexDbExists` to the deterministic helper (write the
+   JSON to a temp file and pipe it; raw `echo '...'` quoting differs between
+   cmd.exe and POSIX shells):
 
    ```
-   echo '{"astToolsAvailable":<bool>,"indexDbExists":<bool>}' | node <this skill's base directory>/scripts/onboarding-lib.cjs engine
+   <json-file> | node <this skill's base directory>/scripts/onboarding-lib.cjs engine
    ```
 
    - `astToolsAvailable` = this session actually exposes `ast_search /
@@ -54,7 +62,8 @@ and mind-map snapshots. Do not refactor, fix, or "improve" the analyzed code.
 
 ## Phase 1 — Session + cache
 
-1. Read `<state-root>/superharness/onboarding/cache.json` if present (may be empty/absent).
+1. Read the onboarding cache (`.claude/superharness/onboarding/cache.json` or
+   `.flavor/superharness/onboarding/cache.json`) if present (may be empty/absent).
 2. Get `git rev-parse HEAD` and the changed-file set:
    - with cache: `git diff --name-only <cache.gitHash> HEAD` plus
      `git status --porcelain` (dirty files);
@@ -62,7 +71,7 @@ and mind-map snapshots. Do not refactor, fix, or "improve" the analyzed code.
 3. Plan the pass with the helper:
 
    ```
-   echo '{"cache":<cache-or-null>,"headHash":"<head>","changedFiles":[...]}' | node <skill base>/scripts/onboarding-lib.cjs refresh
+   <json-file: {"cache":<cache-or-null>,"headHash":"<head>","changedFiles":[...]}> | node <skill base>/scripts/onboarding-lib.cjs refresh
    ```
 
    `{full:true}` → module discovery for everything; otherwise only the
@@ -75,10 +84,11 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "<superharness skills dir>/b
 ```
 
 Save `url`, `content_dir`, `state_dir` from the JSON it prints, tell the user to
-open the URL, and remind them `<state-root>/superharness/brainstorm/` should be
-gitignored. Push snapshots using the brainstorm message protocol
-(`type:"mindmap:snapshot"`); node `kind` values additionally used here are
-`module`, `flow`, `entity`.
+open the URL, and remind them the brainstorm session dir (`.claude/superharness/brainstorm/`
+or `.flavor/superharness/brainstorm/`) should be gitignored. Push snapshots using
+the brainstorm message protocol (`type:"mindmap:snapshot"`); node `kind` values
+additionally used here are `module`, `flow`, `entity`; stale entries are pushed
+with `state: "stale"` (the viewer greys them out).
 
 ## Phase 2 — Phase A: module overview (shallow, bounded cost)
 
@@ -136,7 +146,7 @@ focused; do not re-analyze cached unchanged modules.
 1. **Stale sweep**:
 
    ```
-   echo '{"cache":<cache>,"existingFiles":[...workspace file list...]}' | node <skill base>/scripts/onboarding-lib.cjs stale
+   <json-file: {"cache":<cache>,"existingFiles":[...workspace file list...]}> | node <skill base>/scripts/onboarding-lib.cjs stale
    ```
 
    Mark returned entries `stale: true` in cache and grey them in the map;

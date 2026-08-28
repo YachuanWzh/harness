@@ -249,3 +249,10 @@ test('mind map page colors the onboarding node kinds (module/flow/entity)', asyn
   assert.match(html, /flow:\s*'#/, 'KIND_COLORS must include flow');
   assert.match(html, /entity:\s*'#/, 'KIND_COLORS must include entity');
 });
+
+test('mind map page greys out stale nodes (onboarding self-check state)', async t => {
+  const { info } = await startServer(t);
+  const html = await (await fetch(info.url + '/')).text();
+  // The onboarding sweep marks dead entries state:"stale"; the viewer must show them greyed.
+  assert.match(html, /\.node\.stale/, 'viewer must define a .node.stale style for stale map entries');
+});

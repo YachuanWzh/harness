@@ -210,7 +210,8 @@ EOF
     if [ -f "$TARGET_DIR/.gitignore" ]; then
         if remove_gitignore_entries "$TARGET_DIR/.gitignore" \
             '.claude/superharness/ralph/' '.claude/superharness/brainstorm/' \
-            '.superharness/' '.flavor/superharness/ralph/'; then
+            '.claude/superharness/onboarding/' \
+            '.superharness/' '.flavor/superharness/ralph/' '.flavor/superharness/onboarding/'; then
             UNINSTALLED_ANYTHING=1
         fi
     fi
@@ -435,6 +436,9 @@ engineering work.
     append_gitignore_entry "$TARGET_DIR/.gitignore" \
         '# superharness brainstorm mind-map session state (transient)' \
         '.claude/superharness/brainstorm/'
+    append_gitignore_entry "$TARGET_DIR/.gitignore" \
+        '# superharness onboarding analysis cache (regenerable, never committed)' \
+        '.claude/superharness/onboarding/'
 
     echo "  Claude Code plugin installed to: $MARKET_DIR"
     INSTALLED_ANYTHING=1
@@ -530,6 +534,9 @@ Usage in flavor-code: \`/<skill-name> <args>\`, e.g. \`/go refactor login module
     append_gitignore_entry "$TARGET_DIR/.gitignore" \
         '# superharness ralph runtime state (per-task tracking + retry)' \
         '.flavor/superharness/ralph/'
+    append_gitignore_entry "$TARGET_DIR/.gitignore" \
+        '# superharness onboarding analysis cache (regenerable, never committed)' \
+        '.flavor/superharness/onboarding/'
 
     echo "  flavor-code plugin installed to: $FLAVOR_PLUGIN_DIR"
     INSTALLED_ANYTHING=1

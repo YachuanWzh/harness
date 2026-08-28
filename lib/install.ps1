@@ -171,7 +171,8 @@ if ($Uninstall) {
     if (Test-Path $GitignorePath) {
         $giChanged = Remove-ManagedGitignoreLines -Path $GitignorePath -Patterns @(
             '.claude/superharness/ralph/', '.claude/superharness/brainstorm/',
-            '.superharness/', '.flavor/superharness/ralph/'
+            '.claude/superharness/onboarding/',
+            '.superharness/', '.flavor/superharness/ralph/', '.flavor/superharness/onboarding/'
         )
         if ($giChanged) { $UninstalledAnything = $true }
     }
@@ -392,7 +393,8 @@ $ClaudeEndMarker
     $giExisting = if (Test-Path $GitignorePath) { [IO.File]::ReadAllText($GitignorePath, $utf8) } else { '' }
     $claudeIgnoreLines = @(
         @{ Comment = '# superharness ralph runtime state (per-task tracking + retry)'; Line = '.claude/superharness/ralph/' },
-        @{ Comment = '# superharness brainstorm mind-map session state (transient)';     Line = '.claude/superharness/brainstorm/' }
+        @{ Comment = '# superharness brainstorm mind-map session state (transient)';     Line = '.claude/superharness/brainstorm/' },
+        @{ Comment = '# superharness onboarding analysis cache (regenerable, never committed)'; Line = '.claude/superharness/onboarding/' }
     )
     foreach ($entry in $claudeIgnoreLines) {
         if ($giExisting -notmatch [regex]::Escape($entry.Line)) {
@@ -519,7 +521,8 @@ $FlavorEndMarker
     $giExisting = if (Test-Path $GitignorePath) { [IO.File]::ReadAllText($GitignorePath, $utf8) } else { '' }
     $flavorIgnoreLines = @(
         @{ Comment = '# superharness brainstorm mind-map session state (transient)'; Line = '.superharness/' },
-        @{ Comment = '# superharness ralph runtime state (per-task tracking + retry)'; Line = '.flavor/superharness/ralph/' }
+        @{ Comment = '# superharness ralph runtime state (per-task tracking + retry)'; Line = '.flavor/superharness/ralph/' },
+        @{ Comment = '# superharness onboarding analysis cache (regenerable, never committed)'; Line = '.flavor/superharness/onboarding/' }
     )
     foreach ($entry in $flavorIgnoreLines) {
         if ($giExisting -notmatch [regex]::Escape($entry.Line)) {

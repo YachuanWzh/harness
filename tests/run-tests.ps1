@@ -903,6 +903,7 @@ try { $out24c = (& powershell -NoProfile -ExecutionPolicy Bypass -File $hookSs) 
 Remove-Item Env:CLAUDE_PLUGIN_ROOT -ErrorAction SilentlyContinue
 $ctx24c = ''
 try { $ctx24c = ($out24c | ConvertFrom-Json).hookSpecificOutput.additionalContext } catch {}
+Assert-True ($ctx24c -match 'superharness') "cache case: hook still injects HARNESS.md (assertion is not vacuous)"
 Assert-True ($ctx24c -notmatch 'superharness-onboarding-hint') "with onboarding cache: no hint"
 
 # 24d. sh counterpart carries the same marker (text-level parity check)
@@ -939,6 +940,23 @@ $shTpl = Get-Content (Join-Path $RepoRoot 'lib\install.sh') -Raw
 Assert-True ($shTpl -match '\*\*onboarding\*\*') "install.sh FLAVOR.md template lists onboarding capability"
 $claudeTpl = Get-Content (Join-Path $RepoRoot 'lib\install.ps1') -Raw
 Assert-True ($claudeTpl -match '/superharness:onboarding|onboarding') "install.ps1 CLAUDE.md/usage text mentions onboarding"
+
+# Important fixes from review:
+# I1 - SKILL.md must not double-nest the cache path (<state-root> already contains /superharness)
+Assert-True ($onb -notmatch '<state-root>/superharness/onboarding') "SKILL.md cache path must not double-nest <state-root>/superharness/"
+Assert-True ($onb -match '\.claude/superharness/onboarding/cache\.json') "SKILL.md names the concrete Claude Code cache path"
+Assert-True ($onb -match '\.flavor/superharness/onboarding/cache\.json') "SKILL.md names the concrete flavor-code cache path"
+
+# I2 - stale greyed-out node style lives in the viewer (asserted in tests/server.test.mjs)
+
+# I3 - installers must gitignore the onboarding cache dir (cache is never committed)
+$gi25 = Get-Content (Join-Path $proj '.gitignore') -Raw
+Assert-True ($gi25 -match '(?m)^\.claude/superharness/onboarding/\r?$') "install adds .claude/superharness/onboarding/ to .gitignore"
+$shInst25 = Get-Content (Join-Path $RepoRoot 'lib\install.sh') -Raw
+Assert-True ($shInst25 -match '\.claude/superharness/onboarding/') "install.sh gitignores the onboarding cache"
+Assert-True ($flavorTpl -match '\.flavor/superharness/onboarding/') "install.ps1 gitignores the flavor onboarding cache"
+$shFlavorSec = Get-Content (Join-Path $RepoRoot 'lib\install.sh') -Raw
+Assert-True ($shFlavorSec -match '\.flavor/superharness/onboarding/') "install.sh gitignores the flavor onboarding cache too"
 
 # ---------------------------------------------------------------- cleanup + summary
 Remove-Item $proj, $proj2, $proj3, $proj4, $emptyDir -Recurse -Force -ErrorAction SilentlyContinue
