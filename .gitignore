@@ -14,3 +14,5 @@ FLAVOR.md
 .superharness/
 # superharness ralph runtime state (per-task tracking + retry)
 .flavor/superharness/ralph/
+# superharness worktree isolation dirs
+.worktrees/
