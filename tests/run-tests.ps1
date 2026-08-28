@@ -153,7 +153,7 @@ Assert-True ($harnessDoc -notmatch 'skills-dir') "HARNESS.md no longer mentions 
 Assert-True ($harnessDoc -match 'superharness:brainstorm') "HARNESS.md lists the brainstorm skill"
 
 $pj = Get-Content (Join-Path (Get-PluginDir $proj4) '.claude-plugin\plugin.json') -Raw | ConvertFrom-Json
-Assert-True ($pj.version -eq '1.0.4') "plugin.json version is 1.0.4"
+Assert-True ($pj.version -eq '1.1.0') "plugin.json version is 1.1.0"
 
 # ---------------------------------------------------------------- Test group 2: skills
 Write-Host "`n[2] Installer copies the go skill and the core engineering skills"

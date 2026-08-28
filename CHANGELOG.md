@@ -2,6 +2,19 @@
 
 本文件记录 Superharness 的用户可见变化，版本号与 Claude Code、flavor-code 两侧插件清单保持一致。
 
+## [1.1.0] - 2026-08-28
+
+### 新增
+- Flavor npm 制品新增跨平台 `superharness` CLI：npm 在 Windows 生成 `.cmd`/PowerShell shim，在 macOS/Linux 生成可执行链接，统一 Node 入口再分发到现有 PowerShell/bash 安装器
+- 制品新增通用 `flavorInstaller` 元数据；`@flavor-code/plugin-manager` 安装后可自动初始化当前项目，并按项目原有标记选择 `FLAVOR.md`、`CLAUDE.md` 或两者
+- 初始化器新增 `--flavor`、`--claude`、`--both`/`--host` 显式宿主选择
+- 初始化文档携带与制品版本绑定的最新更新摘要；重复运行只替换 SUPERHARNESS marker 区间
+- npm 全局 bin 不在 PATH 时，插件管理器可幂等写入 Windows 用户 PATH 或 macOS zsh/bash profile
+
+### 变更
+- Flavor 发布制品现在同时携带完整双宿主模板、安装器、npm CLI 元数据与发布摘要
+- `superharness self-update` 在 npm 安装场景下更新全局 npm 包
+
 ## [1.0.4] - 2026-08-28
 
 ### 新增

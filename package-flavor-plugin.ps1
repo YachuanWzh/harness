@@ -17,8 +17,9 @@ $OutputDirectory = [IO.Path]::GetFullPath($OutputDirectory)
 $sourceRoot = Join-Path $RepositoryRoot 'template\plugins\superharness'
 $claudeManifestPath = Join-Path $sourceRoot '.claude-plugin\plugin.json'
 $flavorManifestPath = Join-Path $sourceRoot 'plugin\flavor-plugin.json'
+$npmManifestPath = Join-Path $sourceRoot 'plugin\package.json'
 
-foreach ($path in @($claudeManifestPath, $flavorManifestPath)) {
+foreach ($path in @($claudeManifestPath, $flavorManifestPath, $npmManifestPath)) {
     if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
         throw "Required manifest not found: $path"
     }
@@ -26,6 +27,7 @@ foreach ($path in @($claudeManifestPath, $flavorManifestPath)) {
 
 $claudeManifest = [IO.File]::ReadAllText($claudeManifestPath) | ConvertFrom-Json
 $flavorManifest = [IO.File]::ReadAllText($flavorManifestPath) | ConvertFrom-Json
+$npmManifest = [IO.File]::ReadAllText($npmManifestPath) | ConvertFrom-Json
 $version = [string]$claudeManifest.version
 if ($version -notmatch '^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$') {
     throw "Invalid SemVer in $claudeManifestPath`: $version"
@@ -46,13 +48,37 @@ if ([string]$flavorManifest.version -ne $version) {
     Write-Host "Synced flavor-plugin.json version to $version" -ForegroundColor Yellow
 }
 
+if ([string]$npmManifest.version -ne $version) {
+    $raw = [IO.File]::ReadAllText($npmManifestPath)
+    $pattern = '(?m)^(\s*"version"\s*:\s*")[^"]+("\s*,?\s*)$'
+    if ([regex]::Matches($raw, $pattern).Count -ne 1) {
+        throw "Could not safely update the version field in $npmManifestPath"
+    }
+    $replacement = '${1}' + $version + '${2}'
+    $updated = [regex]::Replace($raw, $pattern, $replacement, 1)
+    [IO.File]::WriteAllText($npmManifestPath, $updated, $utf8NoBom)
+    Write-Host "Synced package.json version to $version" -ForegroundColor Yellow
+}
+
+$releaseNotesPath = Join-Path $sourceRoot 'RELEASE-NOTES.md'
+$releaseNotes = [IO.File]::ReadAllText($releaseNotesPath)
+if ($releaseNotes -notmatch ('(?m)^### Latest update \(v' + [regex]::Escape($version) + '\)$')) {
+    throw "RELEASE-NOTES.md must describe the packaged version $version"
+}
+
 $required = @(
     (Join-Path $sourceRoot 'plugin\flavor-plugin.json'),
     (Join-Path $sourceRoot 'plugin\index.js'),
+    (Join-Path $sourceRoot 'plugin\package.json'),
     (Join-Path $sourceRoot 'HARNESS.md'),
+    (Join-Path $sourceRoot 'RELEASE-NOTES.md'),
     (Join-Path $sourceRoot 'skills'),
     (Join-Path $sourceRoot 'scripts\ralph-lib.ps1'),
-    (Join-Path $sourceRoot 'scripts\ralph-lib.sh')
+    (Join-Path $sourceRoot 'scripts\ralph-lib.sh'),
+    (Join-Path $RepositoryRoot 'bin\superharness.cjs'),
+    (Join-Path $RepositoryRoot 'lib\install.ps1'),
+    (Join-Path $RepositoryRoot 'lib\install.sh'),
+    (Join-Path $RepositoryRoot 'template')
 )
 foreach ($path in $required) {
     if (-not (Test-Path -LiteralPath $path)) { throw "Required plugin content not found: $path" }
@@ -84,9 +110,14 @@ foreach ($target in @($stage, $archive)) {
 New-Item -ItemType Directory -Path $stage | Out-Null
 Copy-Item -LiteralPath (Join-Path $sourceRoot 'plugin\flavor-plugin.json') -Destination (Join-Path $stage 'flavor-plugin.json')
 Copy-Item -LiteralPath (Join-Path $sourceRoot 'plugin\index.js') -Destination (Join-Path $stage 'index.js')
+Copy-Item -LiteralPath (Join-Path $sourceRoot 'plugin\package.json') -Destination (Join-Path $stage 'package.json')
 Copy-Item -LiteralPath (Join-Path $sourceRoot 'HARNESS.md') -Destination (Join-Path $stage 'HARNESS.md')
+Copy-Item -LiteralPath (Join-Path $sourceRoot 'RELEASE-NOTES.md') -Destination (Join-Path $stage 'RELEASE-NOTES.md')
 Copy-Item -LiteralPath (Join-Path $sourceRoot 'skills') -Destination $stage -Recurse
 Copy-Item -LiteralPath (Join-Path $sourceRoot 'scripts') -Destination $stage -Recurse
+Copy-Item -LiteralPath (Join-Path $RepositoryRoot 'bin') -Destination $stage -Recurse
+Copy-Item -LiteralPath (Join-Path $RepositoryRoot 'lib') -Destination $stage -Recurse
+Copy-Item -LiteralPath (Join-Path $RepositoryRoot 'template') -Destination $stage -Recurse
 
 $tarCommand = Get-Command tar.exe -ErrorAction SilentlyContinue
 if ($null -eq $tarCommand) { $tarCommand = Get-Command tar -ErrorAction Stop }
@@ -96,7 +127,15 @@ if ($LASTEXITCODE -ne 0) { throw "tar failed with exit code $LASTEXITCODE" }
 & $tarCommand.Source -tzf $archive | Out-Null
 if ($LASTEXITCODE -ne 0) { throw "Generated archive could not be read: $archive" }
 
-$hash = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant()
+$sha256 = [Security.Cryptography.SHA256]::Create()
+$archiveStream = [IO.File]::OpenRead($archive)
+try {
+    $hashBytes = $sha256.ComputeHash($archiveStream)
+    $hash = ([BitConverter]::ToString($hashBytes)).Replace('-', '').ToLowerInvariant()
+} finally {
+    $archiveStream.Dispose()
+    $sha256.Dispose()
+}
 Write-Host "" 
 Write-Host "Flavor plugin package ready" -ForegroundColor Green
 Write-Host "  Version : $version"

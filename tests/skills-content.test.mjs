@@ -17,7 +17,7 @@ const read = (...parts) => fs.readFileSync(path.join(TEMPLATE, ...parts), 'utf8'
 const exists = (...parts) => fs.existsSync(path.join(TEMPLATE, ...parts));
 
 function assertFrontmatter(doc, name) {
-  const m = doc.match(/^---\n([\s\S]*?)\n---/);
+  const m = doc.match(/^---\r?\n([\s\S]*?)\r?\n---/);
   assert.ok(m, `${name}: SKILL.md must start with a YAML frontmatter block`);
   assert.ok(m[1].includes(`name: ${name}`), `${name}: frontmatter name must be "${name}"`);
   assert.match(m[1], /description: Use when /, `${name}: description must start with "Use when "`);

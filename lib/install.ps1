@@ -185,11 +185,15 @@ if ($Uninstall) {
     exit 0
 }
 
-# --- Parse optional --template / --stack / --frontend / --backend / --uninstall from forwarded CLI args ---
+# --- Parse optional host/template flags from forwarded CLI args ---
 $Template = $null; $Stack = $null; $Frontend = $null; $Backend = $null
+$RequestedHosts = @()
 $sawTemplateFlag = $false; $sawStackFlag = $false; $sawFrontendFlag = $false; $sawBackendFlag = $false
 foreach ($a in $Rest) {
-    if ($a -match '^--template($|=)') {
+    if ($a -in @('--flavor', '--claude', '--both')) {
+        $RequestedHosts += $a.Substring(2)
+    }
+    elseif ($a -match '^--template($|=)') {
         $sawTemplateFlag = $true
         if ($a -match '^--template=(.+)$') { $Template = $Matches[1].ToLower() }
     }
@@ -206,6 +210,11 @@ foreach ($a in $Rest) {
         if ($a -match '^--backend=(.+)$') { $Backend = $Matches[1].ToLower() }
     }
 }
+if ($RequestedHosts.Count -gt 1) {
+    Write-Error "Choose only one host selector: --flavor, --claude, or --both."
+    exit 1
+}
+$RequestedHost = if ($RequestedHosts.Count -eq 1) { $RequestedHosts[0] } else { $null }
 if ($sawTemplateFlag -and -not $Template) {
     Write-Error "--template requires a value. Valid: frontend, backend, fullstack."
     exit 1
@@ -260,6 +269,12 @@ if ($Template) {
 }
 
 $utf8 = New-Object System.Text.UTF8Encoding($false)
+$ReleaseNotesPath = Join-Path $TemplateDir 'plugins\superharness\RELEASE-NOTES.md'
+$ReleaseNotes = if (Test-Path -LiteralPath $ReleaseNotesPath -PathType Leaf) {
+    [IO.File]::ReadAllText($ReleaseNotesPath, $utf8).Trim()
+} else {
+    '### Latest update`r`n`r`nSee the installed plugin changelog for this version.'
+}
 
 function Set-Member {
     param($Object, [string]$Name, $Value)
@@ -296,12 +311,19 @@ function Write-StackGuidance {
 # 0. Detect project type
 # ============================================================================
 
-$HasClaudeMarker = (Test-Path (Join-Path $TargetDir 'CLAUDE.md')) -or (Test-Path (Join-Path $TargetDir '.claude'))
-$HasFlavorMarker = (Test-Path (Join-Path $TargetDir 'FLAVOR.md')) -or (Test-Path (Join-Path $TargetDir '.flavor'))
+$HasClaudeMarker = $false
+$HasFlavorMarker = $false
+if ($RequestedHost) {
+    $HasClaudeMarker = $RequestedHost -in @('claude', 'both')
+    $HasFlavorMarker = $RequestedHost -in @('flavor', 'both')
+} else {
+    $HasClaudeMarker = (Test-Path (Join-Path $TargetDir 'CLAUDE.md')) -or (Test-Path (Join-Path $TargetDir '.claude'))
+    $HasFlavorMarker = (Test-Path (Join-Path $TargetDir 'FLAVOR.md')) -or (Test-Path (Join-Path $TargetDir '.flavor'))
 
-# Backward compatible: if nothing detected, default to Claude Code
-if (-not $HasClaudeMarker -and -not $HasFlavorMarker) {
-    $HasClaudeMarker = $true
+    # Backward compatible: a direct invocation in an uninitialized directory defaults to Claude Code.
+    if (-not $HasClaudeMarker -and -not $HasFlavorMarker) {
+        $HasClaudeMarker = $true
+    }
 }
 
 $InstalledAnything = $false
@@ -370,6 +392,8 @@ engineering work.
   ``/superharness:onboarding [module or flow]``
 - Non-negotiable: strict TDD (failing test first), systematic debugging, and
   verification with real command output before claiming anything is done.
+
+$ReleaseNotes
 $ClaudeEndMarker
 "@
 
@@ -499,6 +523,8 @@ Key capabilities:
 - **subagent-driven-development** -- Execute multi-task plans with parallel subagents.
 
 Usage in flavor-code: ``/<skill-name> <args>``, e.g. ``/go refactor login module`` or ``/brainstorm payment plan``.
+
+$ReleaseNotes
 $FlavorEndMarker
 "@
 

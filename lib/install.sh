@@ -26,6 +26,7 @@ STACK=""
 FRONTEND=""
 BACKEND=""
 UNINSTALL=0
+REQUESTED_HOST=""
 SAW_TEMPLATE=0
 SAW_STACK=0
 SAW_FRONTEND=0
@@ -35,6 +36,15 @@ for a in "$@"; do
     case "$a" in
         --self-update|-self-update|self-update) SELF_UPDATE=1 ;;
         --uninstall|-uninstall) UNINSTALL=1 ;;
+        --flavor)
+            [ -z "$REQUESTED_HOST" ] || { echo "Choose only one host selector: --flavor, --claude, or --both." >&2; exit 1; }
+            REQUESTED_HOST="flavor" ;;
+        --claude)
+            [ -z "$REQUESTED_HOST" ] || { echo "Choose only one host selector: --flavor, --claude, or --both." >&2; exit 1; }
+            REQUESTED_HOST="claude" ;;
+        --both)
+            [ -z "$REQUESTED_HOST" ] || { echo "Choose only one host selector: --flavor, --claude, or --both." >&2; exit 1; }
+            REQUESTED_HOST="both" ;;
         --target-dir=*) TARGET_DIR="${a#--target-dir=}" ;;
         --target-dir)   TARGET_DIR="__NEXT__" ;;
         --template=*)   SAW_TEMPLATE=1; TEMPLATE="${a#--template=}"; TEMPLATE="$(printf '%s' "$TEMPLATE" | tr '[:upper:]' '[:lower:]')" ;;
@@ -56,6 +66,15 @@ if [ "$TARGET_DIR" = "__NEXT__" ]; then
 fi
 
 [ -d "$TARGET_DIR" ] || { echo "Target directory not found: $TARGET_DIR" >&2; exit 1; }
+
+RELEASE_NOTES_PATH="$TEMPLATE_DIR/plugins/superharness/RELEASE-NOTES.md"
+if [ -f "$RELEASE_NOTES_PATH" ]; then
+    RELEASE_NOTES="$(cat "$RELEASE_NOTES_PATH")"
+else
+    RELEASE_NOTES='### Latest update
+
+See the installed plugin changelog for this version.'
+fi
 
 # ============================================================================
 # 0. Self-update mode — delegate to install-global.sh so the global install
@@ -370,12 +389,17 @@ write_stack_guidance() {
 
 HAS_CLAUDE=0
 HAS_FLAVOR=0
-{ [ -f "$TARGET_DIR/CLAUDE.md" ] || [ -d "$TARGET_DIR/.claude" ]; } && HAS_CLAUDE=1
-{ [ -f "$TARGET_DIR/FLAVOR.md" ] || [ -d "$TARGET_DIR/.flavor" ]; } && HAS_FLAVOR=1
+if [ -n "$REQUESTED_HOST" ]; then
+    { [ "$REQUESTED_HOST" = "claude" ] || [ "$REQUESTED_HOST" = "both" ]; } && HAS_CLAUDE=1
+    { [ "$REQUESTED_HOST" = "flavor" ] || [ "$REQUESTED_HOST" = "both" ]; } && HAS_FLAVOR=1
+else
+    { [ -f "$TARGET_DIR/CLAUDE.md" ] || [ -d "$TARGET_DIR/.claude" ]; } && HAS_CLAUDE=1
+    { [ -f "$TARGET_DIR/FLAVOR.md" ] || [ -d "$TARGET_DIR/.flavor" ]; } && HAS_FLAVOR=1
 
-# Backward compatible: if nothing detected, default to Claude Code
-if [ "$HAS_CLAUDE" = "0" ] && [ "$HAS_FLAVOR" = "0" ]; then
-    HAS_CLAUDE=1
+    # Backward compatible: a direct invocation in an uninitialized directory defaults to Claude Code.
+    if [ "$HAS_CLAUDE" = "0" ] && [ "$HAS_FLAVOR" = "0" ]; then
+        HAS_CLAUDE=1
+    fi
 fi
 
 INSTALLED_ANYTHING=0
@@ -405,7 +429,8 @@ if [ "$HAS_CLAUDE" = "1" ]; then
     rm -rf "$TARGET_DIR/.claude/skills/superharness"
 
     # --- 1e. Managed section in CLAUDE.md ---
-    CLAUDE_SECTION='<!-- SUPERHARNESS:BEGIN -->
+    CLAUDE_SECTION="$(cat <<'SUPERHARNESS_CLAUDE_EOF'
+<!-- SUPERHARNESS:BEGIN -->
 ## Superharness
 
 This project uses **superharness**, loaded as a Claude Code plugin from the local
@@ -424,7 +449,12 @@ engineering work.
   `/superharness:onboarding [module or flow]`
 - Non-negotiable: strict TDD (failing test first), systematic debugging, and
   verification with real command output before claiming anything is done.
-<!-- SUPERHARNESS:END -->'
+SUPERHARNESS_CLAUDE_EOF
+)"
+    CLAUDE_SECTION="$CLAUDE_SECTION
+
+$RELEASE_NOTES
+<!-- SUPERHARNESS:END -->"
 
     upsert_managed_section "$TARGET_DIR/CLAUDE.md" \
         '<!-- SUPERHARNESS:BEGIN -->' '<!-- SUPERHARNESS:END -->' "$CLAUDE_SECTION"
@@ -523,7 +553,10 @@ Key capabilities:
 - **using-git-worktrees** -- Isolate work in a disposable workspace.
 - **subagent-driven-development** -- Execute multi-task plans with parallel subagents.
 
-Usage in flavor-code: \`/<skill-name> <args>\`, e.g. \`/go refactor login module\` or \`/brainstorm payment plan\`.
+Usage in flavor-code: \`/<skill-name> <args>\`, e.g. \`/go refactor login module\` or \`/brainstorm payment plan\`."
+    FLAVOR_SECTION="$FLAVOR_SECTION
+
+$RELEASE_NOTES
 <!-- SUPERHARNESS:FLAVOR-END -->"
 
     upsert_managed_section "$TARGET_DIR/FLAVOR.md" \

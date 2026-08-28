@@ -23,7 +23,34 @@ flavor-code 项目（`FLAVOR.md` / `.flavor` 标记）则安装为 `.flavor/plug
 
 ## 安装
 
-### 全局安装（推荐，一次性）
+### 从 Flavor 插件目录安装（推荐）
+
+`superharness` 制品同步到 npm 后，在目标项目运行：
+
+```bash
+npx --yes @flavor-code/plugin-manager@latest add superharness
+```
+
+安装器会在写入插件前检测项目类型：已有 `FLAVOR.md`/`.flavor` 时初始化 Flavor，已有
+`CLAUDE.md`/`.claude` 时初始化 Claude Code，两者都有时同时更新；空目录通过 Flavor 插件
+管理器安装时默认创建 `FLAVOR.md`。所有文档更新都限制在 SUPERHARNESS marker 区间内，并
+写入当前制品版本及最新更新摘要，不覆盖用户内容。
+
+制品还声明了 npm `bin`。插件管理器会把全局 `superharness` 命令安装到无须管理员权限的用户
+prefix（Windows：`%LOCALAPPDATA%\flavor-code\npm`；macOS/Linux：`~/.local/bin`），并在该
+目录不在 PATH 时幂等写入用户配置（Windows 用户 PATH；macOS 的 zsh/bash profile）。修改
+PATH 后需打开新终端。以后可在任意目录执行：
+
+```bash
+superharness                 # 自动检测已有项目标记；无标记时兼容默认 Claude Code
+superharness --flavor        # 显式初始化/更新 FLAVOR.md
+superharness --claude        # 显式初始化/更新 CLAUDE.md
+superharness --both          # 同时初始化两侧
+```
+
+可用 `--no-init`、`--no-global-cli` 或 `--no-path` 关闭 plugin-manager 对应的安装后动作。
+
+### 从源码全局安装（兼容方式）
 
 **Windows**：把 superharness 安装到 `%LOCALAPPDATA%\superharness\`，之后在任何目录都能直接使用——删掉 clone 仓库也不影响：
 
@@ -315,6 +342,7 @@ Windows 侧 `scripts/ralph-lib.ps1`（dot-source 即用），macOS/Linux 侧 `sc
 
 ```
 superharness\
+├── bin\superharness.cjs     # npm bin 跨平台入口（Node 分发到 PowerShell/bash）
 ├── bin\superharness.cmd     # Windows CLI 入口（PATH 上可直接调用）
 ├── bin\superharness         # macOS/Linux CLI 入口（bash）
 ├── lib\install.ps1          # Windows 安装器逻辑（可测试）
@@ -323,6 +351,7 @@ superharness\
 │   ├── .claude-plugin\marketplace.json   # marketplace 目录文件
 │   └── plugins\superharness\             # 插件本体
 │       ├── .claude-plugin\plugin.json    # 插件清单（提供 superharness: 命名空间）
+│       ├── RELEASE-NOTES.md               # 随制品发布并写入初始化文档的版本摘要
 │       ├── HARNESS.md                    # 会话启动时注入的约束规则
 │       ├── hooks\hooks.json              # SessionStart + UserPromptSubmit + Stop 钩子注册（node 内联调度器按平台选 .ps1/.sh）
 │       ├── hooks\session-start.ps1|.sh   # 注入 HARNESS.md 的钩子（双平台）

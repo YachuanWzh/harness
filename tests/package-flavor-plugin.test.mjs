@@ -18,16 +18,27 @@ test("package script syncs the Flavor version and creates a complete tgz", () =>
     mkdirSync(join(source, "plugin"), { recursive: true });
     mkdirSync(join(source, "skills", "go"), { recursive: true });
     mkdirSync(join(source, "scripts"), { recursive: true });
+    mkdirSync(join(fixture, "bin"), { recursive: true });
+    mkdirSync(join(fixture, "lib"), { recursive: true });
     writeFileSync(join(source, ".claude-plugin", "plugin.json"), JSON.stringify({ name: "superharness", version: "9.8.7" }));
     writeFileSync(join(source, "plugin", "flavor-plugin.json"), JSON.stringify({
       name: "superharness", version: "0.0.1", apiVersion: "1", main: "./index.js", permissions: [],
       contributes: { commands: [], tools: [], hooks: [], skillRoots: [{ name: "superharness", path: "./skills" }], modelAdapters: [] },
     }, null, 2));
     writeFileSync(join(source, "plugin", "index.js"), "export function activate() {}\n");
+    writeFileSync(join(source, "plugin", "package.json"), JSON.stringify({
+      name: "@flavor-code/superharness", version: "0.0.1", type: "module",
+      bin: { superharness: "./bin/superharness.cjs" },
+      flavorInstaller: { schemaVersion: 1, projectInitializer: "./bin/superharness.cjs", globalCli: true, defaultHost: "flavor" },
+    }, null, 2));
     writeFileSync(join(source, "HARNESS.md"), "# Harness\n");
+    writeFileSync(join(source, "RELEASE-NOTES.md"), "### Latest update (v9.8.7)\n\n- Test release.\n");
     writeFileSync(join(source, "skills", "go", "SKILL.md"), "# Go\n");
     writeFileSync(join(source, "scripts", "ralph-lib.ps1"), "# ps\n");
     writeFileSync(join(source, "scripts", "ralph-lib.sh"), "# sh\n");
+    writeFileSync(join(fixture, "bin", "superharness.cjs"), "#!/usr/bin/env node\n");
+    writeFileSync(join(fixture, "lib", "install.ps1"), "# installer\n");
+    writeFileSync(join(fixture, "lib", "install.sh"), "#!/usr/bin/env bash\n");
 
     const result = spawnSync("powershell", [
       "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", SCRIPT,
@@ -36,13 +47,19 @@ test("package script syncs the Flavor version and creates a complete tgz", () =>
     assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
     const flavor = JSON.parse(readFileSync(join(source, "plugin", "flavor-plugin.json"), "utf8"));
     assert.equal(flavor.version, "9.8.7");
+    assert.equal(JSON.parse(readFileSync(join(source, "plugin", "package.json"), "utf8")).version, "9.8.7");
 
     const stage = join(output, "superharness-9.8.7");
     const archive = join(output, "superharness-9.8.7.tgz");
     const listing = spawnSync("tar.exe", ["-tzf", archive], { encoding: "utf8" });
     assert.equal(listing.status, 0, listing.stderr);
     const files = listing.stdout.split(/\r?\n/).map((value) => value.replace(/^\.\//, ""));
-    for (const required of ["flavor-plugin.json", "index.js", "HARNESS.md", "skills/go/SKILL.md", "scripts/ralph-lib.ps1", "scripts/ralph-lib.sh"]) {
+    for (const required of [
+      "flavor-plugin.json", "index.js", "package.json", "HARNESS.md", "RELEASE-NOTES.md",
+      "skills/go/SKILL.md", "scripts/ralph-lib.ps1", "scripts/ralph-lib.sh",
+      "bin/superharness.cjs", "lib/install.ps1", "lib/install.sh",
+      "template/plugins/superharness/plugin/flavor-plugin.json",
+    ]) {
       assert.ok(files.includes(required), `archive missing ${required}`);
     }
     assert.equal(JSON.parse(readFileSync(join(stage, "flavor-plugin.json"), "utf8")).version, "9.8.7");
