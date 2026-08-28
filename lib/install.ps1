@@ -492,6 +492,8 @@ Key capabilities:
 - **systematic-debugging** -- Root-cause tracing, defense-in-depth, no guess-and-patch.
 - **verification-before-completion** -- Run the full test suite and show real output before claiming done.
 - **requesting-code-review** -- Dispatch a reviewer subagent over the diff.
+- **receiving-code-review** -- Verify review findings against the code before implementing; no performative agreement, no blind fixes.
+- **converge** -- Audit implementation vs spec/plan after review; append leftovers as tasks and sink a living spec (go Phase 4.5).
 - **writing-plans** -- Break down multi-step work into bite-sized TDD tasks.
 - **using-git-worktrees** -- Isolate work in a disposable workspace.
 - **subagent-driven-development** -- Execute multi-task plans with parallel subagents.

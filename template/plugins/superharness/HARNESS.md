@@ -28,6 +28,8 @@ the Skill tool before doing anything else.**
 | `superharness:test-driven-development` | Implementing ANY feature or bugfix, before writing implementation code |
 | `superharness:systematic-debugging` | Any bug, test failure, or unexpected behavior, before proposing fixes |
 | `superharness:requesting-code-review` | A task or major feature is complete, before moving on or merging |
+| `superharness:receiving-code-review` | Code review feedback arrived, before implementing the suggestions |
+| `superharness:converge` | A go run passed tests and review but not finished yet — audit implementation vs spec, append leftovers, sink the living spec (go Phase 4.5) |
 | `superharness:verification-before-completion` | About to claim work is complete, fixed, or passing |
 
 ## Non-Negotiable Constraints

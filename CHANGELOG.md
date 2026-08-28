@@ -2,6 +2,20 @@
 
 本文件记录 Superharness 的用户可见变化，版本号与 Claude Code、flavor-code 两侧插件清单保持一致。
 
+## [1.0.4] - 2026-08-28
+
+### 新增
+- 新 Skill `receiving-code-review`（移植自 superpowers，适配）：收到评审反馈后**先验证再实施**——禁止表演式同意、多条目先澄清再按 Critical→简单→复杂顺序逐项 TDD、对站不住脚的评审意见凭证据反驳、保留 YAGNI 检查
+- 新 Skill `converge`（go Phase 4.5，概念参考 spec-kit `/converge` 与 OpenSpec 规格沉淀）：审查通过后、收尾之前，对照 spec/计划把每条需求判定为 done/partial/missing/divergent（done 必须引用文件+测试证据）；未收敛项**追加为新任务**回 Phase 2 重做，共享 Ralph 重试封顶（5 次）防死循环
+- **Living spec 沉淀**：收敛达成后，将"系统当前行为"以 Requirement + WHEN/THEN Scenario 格式写入 `<state-root>/superharness/specs/`（brainstorm 产物存在则就地更新不另写一份），让意图跨会话累积，成为下次冷启动/续跑的可对账真相
+- `go` 工作流由七阶段扩展为八阶段（审查与收尾之间加入收敛）；trace 新增 `converge:pass` / `converge:gap` 事件
+- **模板优化（stacks）**：5 份栈文档（React/Vue/Python/Node/Java）各新增三节——`Verify commands against the project`（先读 package.json/pyproject/构建文件确认命令，杜绝写死命令假阳性）、`Test boundaries & mocking`（栈专属 mock 边界：React 不 mock 被测树、msw/respx/Testcontainers 等）、`Key libraries`（常用库 + 版本锚定提示）
+- `fullstack-seam` 强化：contract-first 演进（OpenAPI/codegen + CI 校验）、seam 变更的 TDD 顺序（契约测试先行）、API 版本化与幂等要求、e2e 明确推荐 Playwright
+- 新增内容断言测试 `tests/skills-content.test.mjs`（11 项，node:test）
+
+### 变更
+- `writing-plans` 的 Self-Review 升级为强制产出的 **Analysis Findings** 块（需求覆盖矩阵 + 矛盾 + 模糊点 + READY 判定），随计划文件保存；`go` Phase 1 设门禁：存在未解决矛盾或覆盖缺口不得进入实现阶段
+
 ## [1.0.3] - 2026-08-28
 
 ### 新增

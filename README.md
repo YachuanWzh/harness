@@ -168,15 +168,16 @@ superharness --uninstall
 /superharness:go 给登录接口增加验证码校验
 ```
 
-`go` 技能驱动七阶段自主工作流：
+`go` 技能驱动八阶段自主工作流：
 
 1. **理解** —— 探索代码、确认目标，必要时一轮澄清
 2. **隔离** —— `using-git-worktrees`：git 项目默认建 worktree/分支隔离，非 git 则原地，绝不阻塞
-3. **计划** —— `writing-plans`：拆成 2-5 分钟的 TDD 小任务，存到 `.claude/superharness/plans/`
+3. **计划** —— `writing-plans`：拆成 2-5 分钟的 TDD 小任务，存到 `.claude/superharness/plans/`；计划末尾强制产出 **Analysis Findings** 块（spec 覆盖矩阵 + 矛盾 + 模糊点），未 READY 不得进入实现
 4. **实现** —— 多任务计划委托 `subagent-driven-development`（每任务派新子代理，主上下文只留计划与协调），琐碎/紧耦合任务主代理内联 `test-driven-development`；均严格红-绿-重构-提交，出问题转 `systematic-debugging`
 5. **验证** —— `verification-before-completion`：跑完整测试套件，贴出真实输出
-6. **审查** —— `requesting-code-review`：派子代理审查 diff，严重问题阻塞收尾
-7. **收尾** —— `finishing-a-development-branch`：合并 worktree 分支、移除 worktree、删除分支（非 git/原地则跳过；不自动 push）
+6. **审查** —— `requesting-code-review`：派子代理审查 diff，严重问题阻塞收尾；处置评审意见走 `receiving-code-review`（先验证再实施、有理则据证据反驳）
+7. **收敛** —— `converge`：对照 spec/计划逐条审计实现（done/partial/missing/divergent），未收敛的追加为新任务回到实现（共享 Ralph 重试封顶）；收敛后把"系统当前行为"沉淀为 living spec（`.claude/superharness/specs/`，与 brainstorm 产物同目录、就地更新）
+8. **收尾** —— `finishing-a-development-branch`：合并 worktree 分支、移除 worktree、删除分支（非 git/原地则跳过；不自动 push）
 
 ### 3.1 轻量任务（light）
 
@@ -307,6 +308,8 @@ Windows 侧 `scripts/ralph-lib.ps1`（dot-source 即用），macOS/Linux 侧 `sc
 | `superharness:systematic-debugging` | superpowers | 任何 bug、测试失败、异常行为 |
 | `superharness:verification-before-completion` | superpowers | 声称"完成/修好/通过"之前 |
 | `superharness:requesting-code-review` | superpowers | 任务完成、合并之前 |
+| `superharness:receiving-code-review` | superpowers（适配） | 收到评审反馈之后、实施修改之前——先验证再实施，拒绝表演式同意 |
+| `superharness:converge` | 本项目（概念参考 spec-kit converge / OpenSpec 规格沉淀） | go 审查通过后、收尾之前：实现 vs spec 逐条对账 + living spec 沉淀（go Phase 4.5） |
 
 ## 仓库结构
 
@@ -328,7 +331,7 @@ superharness\
 │       ├── plugin\flavor-plugin.json     # flavor-code 插件清单（声明 8 个生命周期钩子）
 │       ├── plugin\index.js               # flavor-code 插件入口（registerHook + skillRoot）
 │       ├── scripts\ralph-lib.ps1|.sh     # Ralph 状态库（go 跟踪 + 重试，钩子引用它；双平台）
-│       └── skills\...                    # go + light + brainstorm + using-git-worktrees + subagent-driven-development + 5 个核心技能
+│       └── skills\...                    # go + light + brainstorm + onboarding + worktree/subagent + 7 个核心工程技能（1.0.4 新增 receiving-code-review、converge）
 │           └── brainstorm\scripts\       # server.cjs / mindmap.html / layout.js / start|stop-server.ps1
 ├── tests\run-tests.ps1      # 安装器/钩子测试套件（PowerShell，TDD）
 ├── tests\*.test.mjs         # 脑图服务器、布局与 flavor 插件钩子测试（node --test）
@@ -360,7 +363,8 @@ Node 套件覆盖：脑图树布局（确定性、无重叠、左右分布）、
 至 state/edits、乐观更新清空时机、编辑面板 UI 就位）、flavor 插件钩子（模拟 flavor-code
 HookBus 驱动 `index.js`：清单声明与注册一致性、SessionStart 注入 HARNESS.md/STACK.md、
 UserPromptSubmit 对 `/go` 自动 bootstrap ralph 状态、Stop 心跳、SessionEnd 续跑指针保留、
-SubagentStop 真实状态载荷与非法事件容错）。
+SubagentStop 真实状态载荷与非法事件容错）、技能与模板内容断言（`skills-content.test.mjs`：receiving-code-review/converge 技能就位、
+Analysis Findings 门禁、go Phase 4.5 收敛接线、stacks 三新节与 seam 强化）。
 
 修改 `template\` 后无需重新安装本仓库——下次在项目里运行 `superharness` 即覆盖更新（安装器会
 把插件 `version` 写为当前模板版本，确保 Claude Code 重新拉取缓存）；已初始化项目中改动插件文件后，

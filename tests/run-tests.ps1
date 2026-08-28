@@ -153,7 +153,7 @@ Assert-True ($harnessDoc -notmatch 'skills-dir') "HARNESS.md no longer mentions 
 Assert-True ($harnessDoc -match 'superharness:brainstorm') "HARNESS.md lists the brainstorm skill"
 
 $pj = Get-Content (Join-Path (Get-PluginDir $proj4) '.claude-plugin\plugin.json') -Raw | ConvertFrom-Json
-Assert-True ($pj.version -eq '1.0.3') "plugin.json version is 1.0.3"
+Assert-True ($pj.version -eq '1.0.4') "plugin.json version is 1.0.4"
 
 # ---------------------------------------------------------------- Test group 2: skills
 Write-Host "`n[2] Installer copies the go skill and the core engineering skills"
@@ -162,7 +162,7 @@ $goSkill = if (Test-Path (Join-Path $plugin 'skills\go\SKILL.md')) { Get-Content
 Assert-True ($goSkill -match '\$ARGUMENTS') "go skill consumes the task goal via `$ARGUMENTS"
 Assert-True ($goSkill -match 'RED|failing test') "go skill enforces the TDD red-green cycle"
 
-$coreSkills = @('test-driven-development','systematic-debugging','writing-plans','verification-before-completion','requesting-code-review')
+$coreSkills = @('test-driven-development','systematic-debugging','writing-plans','verification-before-completion','requesting-code-review','receiving-code-review','converge')
 foreach ($s in $coreSkills) {
     Assert-True (Test-Path (Join-Path $plugin "skills\$s\SKILL.md")) "includes core skill: $s"
 }
