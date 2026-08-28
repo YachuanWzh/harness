@@ -2,7 +2,7 @@
 
 本文件记录 Superharness 的用户可见变化，版本号与 Claude Code、flavor-code 两侧插件清单保持一致。
 
-## [2.3.0] - 2026-08-28
+## [1.0.3] - 2026-08-28
 
 ### 新增
 - 新 Skill `onboarding`（`/superharness:onboarding`、`/onboarding`）：深度分析工作区业务逻辑，产出 `ONBOARDING.md` + `docs/onboarding/*.md` 与浏览器交互式模块导图，帮助新人快速上手
@@ -13,12 +13,12 @@
 - 思维导图 viewer 新增 `module` / `flow` / `entity` 节点配色
 - 新增确定性辅助库 `skills/onboarding/scripts/onboarding-lib.cjs`（引擎判定/增量规划/stale 自查，含 CLI）与 `tests/onboarding-lib.test.mjs`
 
-## [2.2.0] - 2026-08-24
+## [1.0.2] - 2026-08-24
 
 ### 新增
 - flavor-code 1.2.20+ 原生支持组合 Skill：`go` 可以通过宿主 `Skill` 工具加载 `writing-plans`、`test-driven-development`、`systematic-debugging` 等完整子 Skill
 - flavor-code 侧支持 Claude 风格 `$ARGUMENTS` 参数展开，`/go <目标>` 与 `/light <目标>` 不再在 Skill 正文中保留未展开宏
-- Flavor 插件清单与 Claude Code 插件版本统一为 2.2.0
+- Flavor 插件清单与 Claude Code 插件版本统一为 1.0.2
 
 ### 修复
 - SessionEnd 改为仅记录 checkpoint，保留 `.current-task`，使跨会话冷启动续跑成立
@@ -31,6 +31,6 @@
 ### 测试
 - 新增 SessionEnd 续跑指针保留、SubagentStop 失败载荷和 Flavor Hook 常量更新测试
 
-## [2.1.0] - 2026-08-10
+## [1.0.1] - 2026-08-10
 
 - 引入 `light` 轻量工作流、Ralph 可续跑状态、双宿主安装和跨平台脚本。
