@@ -865,6 +865,54 @@ Assert-True ($goMd23 -match 'finishing-a-development-branch') "go skill delegate
 $harnessDoc23 = Get-Content (Join-Path $plugin 'HARNESS.md') -Raw
 Assert-True ($harnessDoc23 -match 'finishing-a-development-branch') "HARNESS.md lists finishing-a-development-branch"
 
+# ---------------------------------------------------------------- Test group 24: onboarding SessionStart nudge (Claude Code host)
+Write-Host "`n[24] session-start.ps1 nudges /onboarding when docs and cache are missing"
+
+$hookSs = Join-Path $plugin 'hooks\session-start.ps1'
+
+# 24a. fresh workspace without ONBOARDING.md and without cache -> hint present
+$wn24 = New-TempProject
+$env:CLAUDE_PLUGIN_ROOT = $plugin
+Push-Location $wn24
+try { $out24 = (& powershell -NoProfile -ExecutionPolicy Bypass -File $hookSs) -join "`n" } finally { Pop-Location }
+Remove-Item Env:CLAUDE_PLUGIN_ROOT -ErrorAction SilentlyContinue
+$ctx24 = ''
+try { $ctx24 = ($out24 | ConvertFrom-Json).hookSpecificOutput.additionalContext } catch {}
+Assert-True ($ctx24 -match '<superharness-onboarding-hint>') "empty workspace: hint asks to run onboarding"
+Assert-True ($ctx24 -match '/onboarding') "hint names the /onboarding command"
+Assert-True ($ctx24 -notmatch '(?i)analyz(es|ing) automatically') "hint never promises automatic analysis"
+
+# 24b. ONBOARDING.md present -> no hint
+Set-Content -Path (Join-Path $wn24 'ONBOARDING.md') -Value '# guide'
+$env:CLAUDE_PLUGIN_ROOT = $plugin
+Push-Location $wn24
+try { $out24b = (& powershell -NoProfile -ExecutionPolicy Bypass -File $hookSs) -join "`n" } finally { Pop-Location }
+Remove-Item Env:CLAUDE_PLUGIN_ROOT -ErrorAction SilentlyContinue
+$ctx24b = ''
+try { $ctx24b = ($out24b | ConvertFrom-Json).hookSpecificOutput.additionalContext } catch {}
+Assert-True ($ctx24b -match 'superharness') "hook still injects HARNESS.md"
+Assert-True ($ctx24b -notmatch 'superharness-onboarding-hint') "with ONBOARDING.md: no hint"
+
+# 24c. cache present but doc not committed -> no hint
+$wn24c = New-TempProject
+New-Item -ItemType Directory -Force (Join-Path $wn24c '.claude\superharness\onboarding') | Out-Null
+Set-Content -Path (Join-Path $wn24c '.claude\superharness\onboarding\cache.json') -Value '{}'
+$env:CLAUDE_PLUGIN_ROOT = $plugin
+Push-Location $wn24c
+try { $out24c = (& powershell -NoProfile -ExecutionPolicy Bypass -File $hookSs) -join "`n" } finally { Pop-Location }
+Remove-Item Env:CLAUDE_PLUGIN_ROOT -ErrorAction SilentlyContinue
+$ctx24c = ''
+try { $ctx24c = ($out24c | ConvertFrom-Json).hookSpecificOutput.additionalContext } catch {}
+Assert-True ($ctx24c -notmatch 'superharness-onboarding-hint') "with onboarding cache: no hint"
+
+# 24d. sh counterpart carries the same marker (text-level parity check)
+$hookSh = Join-Path $plugin 'hooks\session-start.sh'
+$sh24 = if (Test-Path $hookSh) { Get-Content $hookSh -Raw } else { '' }
+Assert-True ($sh24 -match 'superharness-onboarding-hint') "session-start.sh carries the same onboarding hint"
+Assert-True ($sh24 -match 'ONBOARDING\.md') "session-start.sh checks for ONBOARDING.md"
+
+Remove-Item $wn24, $wn24c -Recurse -Force -ErrorAction SilentlyContinue
+
 # ---------------------------------------------------------------- cleanup + summary
 Remove-Item $proj, $proj2, $proj3, $proj4, $emptyDir -Recurse -Force -ErrorAction SilentlyContinue
 

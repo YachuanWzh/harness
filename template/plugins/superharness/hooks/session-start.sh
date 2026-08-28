@@ -21,7 +21,8 @@ emit_payload() {
     if command -v node >/dev/null 2>&1; then
         node -e '
             const fs = require("fs");
-            const [harnessPath, stackPath] = process.argv.slice(1);
+            const path = require("path");
+            const [harnessPath, stackPath, workspace] = process.argv.slice(1);
             let ctx = "<EXTREMELY_IMPORTANT>\nYou have superharness. Follow it for all engineering work in this project.\n\n"
                 + fs.readFileSync(harnessPath, "utf8") + "\n</EXTREMELY_IMPORTANT>";
             if (stackPath && fs.existsSync(stackPath)) {
@@ -30,21 +31,35 @@ emit_payload() {
                     ctx += "\n\n<EXTREMELY_IMPORTANT>\nThis project targets a specific tech stack. Follow this guidance.\n\n" + s + "\n</EXTREMELY_IMPORTANT>";
                 }
             }
+            // One-line onboarding nudge when neither the generated doc nor the
+            // analysis cache exists. Manual-only; never auto-analyze.
+            if (workspace && fs.existsSync(workspace)
+                && !fs.existsSync(path.join(workspace, "ONBOARDING.md"))
+                && !fs.existsSync(path.join(workspace, ".claude", "superharness", "onboarding", "cache.json"))) {
+                ctx += "\n\n<superharness-onboarding-hint>\nNo onboarding guide for this workspace yet. Run /onboarding (superharness:onboarding) to analyze the codebase, map module business relationships, and generate ONBOARDING.md plus an interactive module mind map. The agent decides when to run it - nothing is analyzed automatically.\n</superharness-onboarding-hint>";
+            }
             process.stdout.write(JSON.stringify({
                 hookSpecificOutput: { hookEventName: "SessionStart", additionalContext: ctx }
             }));
-        ' "$harness_path" "$stack_path"
+        ' "$harness_path" "$stack_path" "$PWD"
     elif command -v python3 >/dev/null 2>&1; then
-        python3 - "$harness_path" "$stack_path" <<'PY'
+        python3 - "$harness_path" "$stack_path" "$PWD" <<'PY'
 import json, os, sys
-harness_path, stack_path = sys.argv[1], sys.argv[2]
+harness_path, stack_path, workspace = sys.argv[1], sys.argv[2], sys.argv[3]
 ctx = ("<EXTREMELY_IMPORTANT>\nYou have superharness. Follow it for all engineering work in this project.\n\n"
-       + open(harness_path, encoding="utf-8").read() + "\n</EXTREMELY_IMPORTANT>")
+       + open(harness_path, encoding="utf-8").read() + "</EXTREMELY_IMPORTANT>")
 if stack_path and os.path.isfile(stack_path):
     s = open(stack_path, encoding="utf-8").read()
     if s.strip():
         ctx += ("\n\n<EXTREMELY_IMPORTANT>\nThis project targets a specific tech stack. Follow this guidance.\n\n"
                 + s + "\n</EXTREMELY_IMPORTANT>")
+if workspace and os.path.isdir(workspace) \
+        and not os.path.isfile(os.path.join(workspace, "ONBOARDING.md")) \
+        and not os.path.isfile(os.path.join(workspace, ".claude", "superharness", "onboarding", "cache.json")):
+    ctx += ("\n\n<superharness-onboarding-hint>\nNo onboarding guide for this workspace yet. "
+            "Run /onboarding (superharness:onboarding) to analyze the codebase, map module business relationships, "
+            "and generate ONBOARDING.md plus an interactive module mind map. "
+            "The agent decides when to run it - nothing is analyzed automatically.\n</superharness-onboarding-hint>")
 print(json.dumps({"hookSpecificOutput": {"hookEventName": "SessionStart", "additionalContext": ctx}}), end="")
 PY
     fi

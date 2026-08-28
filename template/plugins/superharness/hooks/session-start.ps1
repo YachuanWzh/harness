@@ -25,6 +25,16 @@ if (Test-Path $stackPath) {
     }
 }
 
+# Append the onboarding nudge when the workspace has neither the generated
+# doc nor an analysis cache (mirrors the flavor-code plugin's SessionStart).
+# Manual-only: hint the command, never auto-analyze.
+$workspace = (Get-Location).Path
+$onboardingDoc  = Join-Path $workspace 'ONBOARDING.md'
+$onboardingCache = Join-Path $workspace '.claude\superharness\onboarding\cache.json'
+if (-not (Test-Path $onboardingDoc) -and -not (Test-Path $onboardingCache)) {
+    $context += "`n`n<superharness-onboarding-hint>`nNo onboarding guide for this workspace yet. Run /onboarding (superharness:onboarding) to analyze the codebase, map module business relationships, and generate ONBOARDING.md plus an interactive module mind map. The agent decides when to run it - nothing is analyzed automatically.`n</superharness-onboarding-hint>"
+}
+
 $payload = @{
     hookSpecificOutput = @{
         hookEventName     = 'SessionStart'

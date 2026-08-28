@@ -156,8 +156,8 @@ test('SessionStart hints /onboarding when the workspace has no onboarding doc or
     const { handler } = host.registered.hook.get('SessionStart');
     const decision = await handler({ version: 1, type: 'SessionStart', payload: { workspace } }, signal0());
     assertHookDecision(decision);
-    assert.match(decision.additionalContext, /尚无新人上手文档[\s\S]*\/onboarding/, 'missing docs: hint the one-line /onboarding command');
-    assert.ok(!/自动|automatically run/i.test(decision.additionalContext), 'hint must not promise auto analysis');
+    assert.match(decision.additionalContext, /<superharness-onboarding-hint>[\s\S]*\/onboarding/, 'missing docs: hint the one-line /onboarding command');
+    assert.ok(!/analyz\w*\s+automatically/i.test(decision.additionalContext.replace('nothing is analyzed automatically', '')), 'hint must not promise auto analysis');
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
     fs.rmSync(workspace, { recursive: true, force: true });
@@ -173,7 +173,7 @@ test('SessionStart stays silent when ONBOARDING.md exists', async () => {
     const { handler } = host.registered.hook.get('SessionStart');
     const decision = await handler({ version: 1, type: 'SessionStart', payload: { workspace } }, signal0());
     assertHookDecision(decision);
-    assert.ok(!/尚无新人上手文档/.test(decision.additionalContext), 'docs present: no hint');
+    assert.ok(!/<superharness-onboarding-hint>/.test(decision.additionalContext), 'docs present: no hint');
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
     fs.rmSync(workspace, { recursive: true, force: true });
@@ -190,7 +190,7 @@ test('SessionStart stays silent when the onboarding cache exists but docs were n
     const { handler } = host.registered.hook.get('SessionStart');
     const decision = await handler({ version: 1, type: 'SessionStart', payload: { workspace } }, signal0());
     assertHookDecision(decision);
-    assert.ok(!/尚无新人上手文档/.test(decision.additionalContext), 'cache present: no hint');
+    assert.ok(!/<superharness-onboarding-hint>/.test(decision.additionalContext), 'cache present: no hint');
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
     fs.rmSync(workspace, { recursive: true, force: true });
