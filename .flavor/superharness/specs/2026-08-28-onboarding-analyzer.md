@@ -21,7 +21,7 @@
 ## astgraph 协同与回退（强制要求）
 
 - **可用性双检测**：① 当前会话存在 `ast_search/ast_callers/ast_callees/ast_impact/ast_context` 工具；② `.flavor/astgraph/index.db` 存在。
-- 工具在但索引缺失 → 提示用户先运行 `/ast init`（构建全量代码图）。
+- 工具在但索引缺失（未执行过 `/ast init`，无 `.flavor/astgraph/index.db`）→ **提示**用户可运行 `/ast init` 建立代码图获得更精确的检索，但**不阻塞等待**：本次立即以降级模式（Grep/LSP 静态分析）继续完成探索；后续运行若检测到索引已存在，自动启用 astgraph 引擎。
 - **未安装 astgraph 插件（含 Claude Code 宿主）、或非 TS/JS/TSX 项目、或 ast_* 工具不可用时，必须回退**：改用 Glob/Grep/Read + LSP（LspFindRefs/LspHover）做静态分析，流程与产出物不变，仅深度与速度下降；并在生成的文档头部标注"分析引擎：fallback"。
 - 回退路径是主设计的一部分，不允许出现"无 astgraph 即功能不可用"的实现。
 
