@@ -153,7 +153,14 @@ Assert-True ($harnessDoc -notmatch 'skills-dir') "HARNESS.md no longer mentions 
 Assert-True ($harnessDoc -match 'superharness:brainstorm') "HARNESS.md lists the brainstorm skill"
 
 $pj = Get-Content (Join-Path (Get-PluginDir $proj4) '.claude-plugin\plugin.json') -Raw | ConvertFrom-Json
-Assert-True ($pj.version -eq '1.1.0') "plugin.json version is 1.1.0"
+Assert-True ($pj.version -eq '1.1.1') "plugin.json version is 1.1.1"
+$fpj = Get-Content (Join-Path (Get-PluginDir $proj4) 'plugin\flavor-plugin.json') -Raw | ConvertFrom-Json
+Assert-True ($fpj.version -eq '1.1.1') "flavor-plugin.json version matches plugin.json (1.1.1)"
+$npkg = Get-Content (Join-Path (Get-PluginDir $proj4) 'plugin\package.json') -Raw | ConvertFrom-Json
+Assert-True ($npkg.version -eq '1.1.1') "plugin package.json version matches plugin.json (1.1.1)"
+$rn1 = Get-Content (Join-Path (Get-PluginDir $proj4) 'RELEASE-NOTES.md') -Raw
+Assert-True ($rn1 -match '(?m)^### Latest update \(v1\.1\.1\)') "RELEASE-NOTES latest-update heading is bound to v1.1.1"
+Assert-True ($cm4 -match 'Latest update \(v1\.1\.1\)') "installed CLAUDE.md carries the v1.1.1 update summary"
 
 # ---------------------------------------------------------------- Test group 2: skills
 Write-Host "`n[2] Installer copies the go skill and the core engineering skills"
@@ -881,6 +888,9 @@ try { $ctx24 = ($out24 | ConvertFrom-Json).hookSpecificOutput.additionalContext 
 Assert-True ($ctx24 -match '<superharness-onboarding-hint>') "empty workspace: hint asks to run onboarding"
 Assert-True ($ctx24 -match '/onboarding') "hint names the /onboarding command"
 Assert-True ($ctx24 -notmatch '(?i)analyz(es|ing) automatically') "hint never promises automatic analysis"
+$hint24 = ''
+if ($ctx24 -match '(?s)<superharness-onboarding-hint>.*?</superharness-onboarding-hint>') { $hint24 = $Matches[0] }
+Assert-True ($hint24 -match '(?i)never self-invoke') "hint forbids agent self-invocation (scoped to hint block)"
 
 # 24b. ONBOARDING.md present -> no hint
 Set-Content -Path (Join-Path $wn24 'ONBOARDING.md') -Value '# guide'
@@ -928,10 +938,13 @@ Assert-True ($onb -match 'ONBOARDING\.md') "onboarding skill writes ONBOARDING.m
 Assert-True ($onb -match 'docs/onboarding/') "onboarding skill writes per-topic docs"
 Assert-True ($onb -match 'cache\.json') "onboarding skill uses the state-root cache"
 Assert-True ($onb -match '(?i)never modify source|read-only|no source edits') "onboarding skill forbids source edits"
+Assert-True ($onb -match 'disable-model-invocation:\s*true') "onboarding skill is manual-only (disable-model-invocation: true)"
+Assert-True ($onb -match '(?i)never self-invoke') "onboarding skill description forbids self-invocation"
 Assert-True (Test-Path (Join-Path $plugin 'skills\onboarding\scripts\onboarding-lib.cjs')) "ships onboarding-lib.cjs"
 
 $harnessDoc25 = Get-Content (Join-Path $plugin 'HARNESS.md') -Raw
 Assert-True ($harnessDoc25 -match 'superharness:onboarding') "HARNESS.md lists the onboarding skill"
+Assert-True ($harnessDoc25 -match '(?i)onboarding[^\n]*never self-invoke') "HARNESS.md marks onboarding never-self-invoke"
 
 # installer docs lists the capability (FLAVOR.md section text lives in install.sh/ps1 templates)
 $flavorTpl = Get-Content (Join-Path $RepoRoot 'lib\install.ps1') -Raw
@@ -940,6 +953,10 @@ $shTpl = Get-Content (Join-Path $RepoRoot 'lib\install.sh') -Raw
 Assert-True ($shTpl -match '\*\*onboarding\*\*') "install.sh FLAVOR.md template lists onboarding capability"
 $claudeTpl = Get-Content (Join-Path $RepoRoot 'lib\install.ps1') -Raw
 Assert-True ($claudeTpl -match '/superharness:onboarding|onboarding') "install.ps1 CLAUDE.md/usage text mentions onboarding"
+Assert-True ($flavorTpl -match '(?i)\*\*onboarding\*\*[^\n]*manual trigger only') "install.ps1 FLAVOR.md template marks onboarding manual-only"
+Assert-True ($shTpl -match '(?i)\*\*onboarding\*\*[^\n]*manual trigger only') "install.sh FLAVOR.md template marks onboarding manual-only"
+Assert-True ($flavorTpl -match '(?i)business logic \(manual trigger only\)') "install.ps1 CLAUDE.md block marks onboarding manual-only"
+Assert-True ($shTpl -match '(?i)business logic \(manual trigger only\)') "install.sh CLAUDE.md block marks onboarding manual-only"
 
 # Important fixes from review:
 # I1 - SKILL.md must not double-nest the cache path (<state-root> already contains /superharness)

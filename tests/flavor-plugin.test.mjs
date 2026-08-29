@@ -158,6 +158,8 @@ test('SessionStart hints /onboarding when the workspace has no onboarding doc or
     assertHookDecision(decision);
     assert.match(decision.additionalContext, /<superharness-onboarding-hint>[\s\S]*\/onboarding/, 'missing docs: hint the one-line /onboarding command');
     assert.ok(!/analyz\w*\s+automatically/i.test(decision.additionalContext.replace('nothing is analyzed automatically', '')), 'hint must not promise auto analysis');
+    const hint = (decision.additionalContext.match(/<superharness-onboarding-hint>[\s\S]*?<\/superharness-onboarding-hint>/) || [''])[0];
+    assert.match(hint, /never self-invoke/i, 'hint must forbid agent self-invocation (scoped to the hint block)');
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
     fs.rmSync(workspace, { recursive: true, force: true });

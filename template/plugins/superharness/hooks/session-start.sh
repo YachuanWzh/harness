@@ -36,7 +36,7 @@ emit_payload() {
             if (workspace && fs.existsSync(workspace)
                 && !fs.existsSync(path.join(workspace, "ONBOARDING.md"))
                 && !fs.existsSync(path.join(workspace, ".claude", "superharness", "onboarding", "cache.json"))) {
-                ctx += "\n\n<superharness-onboarding-hint>\nNo onboarding guide for this workspace yet. Run /onboarding (superharness:onboarding) to analyze the codebase, map module business relationships, and generate ONBOARDING.md plus an interactive module mind map. The agent decides when to run it - nothing is analyzed automatically.\n</superharness-onboarding-hint>";
+                ctx += "\n\n<superharness-onboarding-hint>\nNo onboarding guide for this workspace yet. Run /onboarding (superharness:onboarding) to analyze the codebase, map module business relationships, and generate ONBOARDING.md plus an interactive module mind map. Only run it when the user explicitly invokes the command - never self-invoke; nothing is analyzed automatically.\n</superharness-onboarding-hint>";
             }
             process.stdout.write(JSON.stringify({
                 hookSpecificOutput: { hookEventName: "SessionStart", additionalContext: ctx }
@@ -59,7 +59,7 @@ if workspace and os.path.isdir(workspace) \
     ctx += ("\n\n<superharness-onboarding-hint>\nNo onboarding guide for this workspace yet. "
             "Run /onboarding (superharness:onboarding) to analyze the codebase, map module business relationships, "
             "and generate ONBOARDING.md plus an interactive module mind map. "
-            "The agent decides when to run it - nothing is analyzed automatically.\n</superharness-onboarding-hint>")
+            "Only run it when the user explicitly invokes the command - never self-invoke; nothing is analyzed automatically.\n</superharness-onboarding-hint>")
 print(json.dumps({"hookSpecificOutput": {"hookEventName": "SessionStart", "additionalContext": ctx}}), end="")
 PY
     fi

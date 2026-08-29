@@ -17,8 +17,12 @@ engineering work.
   `/superharness:light <task goal>`
 - Brainstorm with a live browser mind map (manual trigger only):
   `/superharness:brainstorm <topic>`
-- Onboard a newcomer / understand the codebase's business logic:
+- Onboard a newcomer / understand the codebase's business logic (manual trigger only):
   `/superharness:onboarding [module or flow]`
 - Non-negotiable: strict TDD (failing test first), systematic debugging, and
   verification with real command output before claiming anything is done.
+
+### Latest update (v1.1.1)
+
+- `onboarding` is now manual-trigger only: it runs when you explicitly invoke `/onboarding` (or `/superharness:onboarding`) and never starts on its own when you ask to explore or understand a project.
 <!-- SUPERHARNESS:END -->

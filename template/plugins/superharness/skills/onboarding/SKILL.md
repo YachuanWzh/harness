@@ -1,6 +1,7 @@
 ---
 name: onboarding
-description: Use when the user runs /superharness:onboarding or /onboarding, or asks to onboard a newcomer / understand the codebase's business logic - deeply analyzes the workspace codebase (module responsibilities, cross-module business flows, data models) and produces ONBOARDING.md plus a live interactive mind map; supports incremental re-runs via cache
+description: Manual-only codebase onboarding analysis - deeply analyzes the workspace codebase (module responsibilities, cross-module business flows, data models) and produces ONBOARDING.md plus a live interactive mind map; supports incremental re-runs via cache. ONLY invoke when the user explicitly runs /superharness:onboarding or /onboarding; never self-invoke.
+disable-model-invocation: true
 argument-hint: [optional focus: module name, flow, or "drill <node>"]
 ---
 

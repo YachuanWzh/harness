@@ -2,6 +2,11 @@
 
 本文件记录 Superharness 的用户可见变化，版本号与 Claude Code、flavor-code 两侧插件清单保持一致。
 
+## [1.1.1] - 2026-08-29
+
+### 变更
+- `onboarding` 改为**仅手动触发**（与 `brainstorm` 对齐）：skill frontmatter 新增 `disable-model-invocation: true`，SKILL.md 描述、HARNESS.md 技能表、SessionStart 提醒文案与安装器 CLAUDE.md/FLAVOR.md 模板统一标注"仅在用户显式运行 /onboarding 时调用，never self-invoke"；普通的项目探索、理解代码类请求不再自动触发深度上手分析
+
 ## [1.1.0] - 2026-08-28
 
 ### 新增

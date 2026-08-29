@@ -388,7 +388,7 @@ engineering work.
   ``/superharness:light <task goal>``
 - Brainstorm with a live browser mind map (manual trigger only):
   ``/superharness:brainstorm <topic>``
-- Onboard a newcomer / understand the codebase's business logic:
+- Onboard a newcomer / understand the codebase's business logic (manual trigger only):
   ``/superharness:onboarding [module or flow]``
 - Non-negotiable: strict TDD (failing test first), systematic debugging, and
   verification with real command output before claiming anything is done.
@@ -511,7 +511,7 @@ Key capabilities:
 - **go** -- Drive a task end-to-end under strict TDD + verification + code review discipline.
 - **light** -- Lightweight mode for small focused tasks: TDD with exemptions, real-output verification, no worktree/plan-file/ralph overhead.
 - **brainstorm** -- Explore requirements with a live browser mind map (manual trigger only).
-- **onboarding** -- Deep-analyze the workspace's business logic for newcomers: ONBOARDING.md + interactive module mind map, astgraph-powered with fallback, incremental via cache.
+- **onboarding** -- Deep-analyze the workspace's business logic for newcomers (manual trigger only): ONBOARDING.md + interactive module mind map, astgraph-powered with fallback, incremental via cache.
 - **test-driven-development** -- RED-GREEN-REFACTOR cycle. No production code without a failing test first.
 - **systematic-debugging** -- Root-cause tracing, defense-in-depth, no guess-and-patch.
 - **verification-before-completion** -- Run the full test suite and show real output before claiming done.
