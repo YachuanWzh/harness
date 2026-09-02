@@ -153,14 +153,14 @@ Assert-True ($harnessDoc -notmatch 'skills-dir') "HARNESS.md no longer mentions 
 Assert-True ($harnessDoc -match 'superharness:brainstorm') "HARNESS.md lists the brainstorm skill"
 
 $pj = Get-Content (Join-Path (Get-PluginDir $proj4) '.claude-plugin\plugin.json') -Raw | ConvertFrom-Json
-Assert-True ($pj.version -eq '1.1.1') "plugin.json version is 1.1.1"
+Assert-True ($pj.version -eq '1.1.2') "plugin.json version is 1.1.2"
 $fpj = Get-Content (Join-Path (Get-PluginDir $proj4) 'plugin\flavor-plugin.json') -Raw | ConvertFrom-Json
-Assert-True ($fpj.version -eq '1.1.1') "flavor-plugin.json version matches plugin.json (1.1.1)"
+Assert-True ($fpj.version -eq '1.1.2') "flavor-plugin.json version matches plugin.json (1.1.2)"
 $npkg = Get-Content (Join-Path (Get-PluginDir $proj4) 'plugin\package.json') -Raw | ConvertFrom-Json
-Assert-True ($npkg.version -eq '1.1.1') "plugin package.json version matches plugin.json (1.1.1)"
+Assert-True ($npkg.version -eq '1.1.2') "plugin package.json version matches plugin.json (1.1.2)"
 $rn1 = Get-Content (Join-Path (Get-PluginDir $proj4) 'RELEASE-NOTES.md') -Raw
-Assert-True ($rn1 -match '(?m)^### Latest update \(v1\.1\.1\)') "RELEASE-NOTES latest-update heading is bound to v1.1.1"
-Assert-True ($cm4 -match 'Latest update \(v1\.1\.1\)') "installed CLAUDE.md carries the v1.1.1 update summary"
+Assert-True ($rn1 -match '(?m)^### Latest update \(v1\.1\.2\)') "RELEASE-NOTES latest-update heading is bound to v1.1.2"
+Assert-True ($cm4 -match 'Latest update \(v1\.1\.2\)') "installed CLAUDE.md carries the v1.1.2 update summary"
 
 # ---------------------------------------------------------------- Test group 2: skills
 Write-Host "`n[2] Installer copies the go skill and the core engineering skills"

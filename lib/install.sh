@@ -429,28 +429,27 @@ if [ "$HAS_CLAUDE" = "1" ]; then
     rm -rf "$TARGET_DIR/.claude/skills/superharness"
 
     # --- 1e. Managed section in CLAUDE.md ---
-    CLAUDE_SECTION="$(cat <<'SUPERHARNESS_CLAUDE_EOF'
-<!-- SUPERHARNESS:BEGIN -->
+    # Keep this as a direct multiline assignment. macOS ships Bash 3.2, whose
+    # legacy parser misreads apostrophes inside a heredoc nested in "$(...)".
+    CLAUDE_SECTION="<!-- SUPERHARNESS:BEGIN -->
 ## Superharness
 
 This project uses **superharness**, loaded as a Claude Code plugin from the local
-marketplace at `.claude/superharness` (enabled in `.claude/settings.json` via
-`extraKnownMarketplaces` + `enabledPlugins`). Its SessionStart hook injects
-`HARNESS.md` into every session. If that context is missing, read
-`.claude/superharness/plugins/superharness/HARNESS.md` now and follow it for all
+marketplace at \`.claude/superharness\` (enabled in \`.claude/settings.json\` via
+\`extraKnownMarketplaces\` + \`enabledPlugins\`). Its SessionStart hook injects
+\`HARNESS.md\` into every session. If that context is missing, read
+\`.claude/superharness/plugins/superharness/HARNESS.md\` now and follow it for all
 engineering work.
 
-- Run a task end-to-end: `/superharness:go <task goal>`
+- Run a task end-to-end: \`/superharness:go <task goal>\`
 - Small focused change (lighter go, no worktree/plan-file/ralph overhead):
-  `/superharness:light <task goal>`
+  \`/superharness:light <task goal>\`
 - Brainstorm with a live browser mind map (manual trigger only):
-  `/superharness:brainstorm <topic>`
+  \`/superharness:brainstorm <topic>\`
 - Onboard a newcomer / understand the codebase's business logic (manual trigger only):
-  `/superharness:onboarding [module or flow]`
+  \`/superharness:onboarding [module or flow]\`
 - Non-negotiable: strict TDD (failing test first), systematic debugging, and
-  verification with real command output before claiming anything is done.
-SUPERHARNESS_CLAUDE_EOF
-)"
+  verification with real command output before claiming anything is done."
     CLAUDE_SECTION="$CLAUDE_SECTION
 
 $RELEASE_NOTES

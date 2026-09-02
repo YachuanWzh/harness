@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const CLI = join(REPO_ROOT, "bin", "superharness.cjs");
+const BASH_INSTALLER = join(REPO_ROOT, "lib", "install.sh");
 
 function initialize(host) {
   const project = mkdtempSync(join(tmpdir(), `superharness-${host}-`));
@@ -21,7 +22,7 @@ test("cross-platform npm CLI initializes Flavor explicitly with current release 
   try {
     const flavor = readFileSync(join(project, "FLAVOR.md"), "utf8");
     assert.match(flavor, /SUPERHARNESS:FLAVOR-BEGIN/);
-    assert.match(flavor, /Latest update \(v1\.1\.0\)/);
+    assert.match(flavor, /Latest update \(v1\.1\.2\)/);
     assert.doesNotMatch(flavor, /SUPERHARNESS:BEGIN -->/);
   } finally { rmSync(project, { recursive: true, force: true }); }
 });
@@ -29,7 +30,16 @@ test("cross-platform npm CLI initializes Flavor explicitly with current release 
 test("cross-platform npm CLI can initialize both hosts", () => {
   const project = initialize("both");
   try {
-    assert.match(readFileSync(join(project, "FLAVOR.md"), "utf8"), /Latest update \(v1\.1\.0\)/);
-    assert.match(readFileSync(join(project, "CLAUDE.md"), "utf8"), /Latest update \(v1\.1\.0\)/);
+    assert.match(readFileSync(join(project, "FLAVOR.md"), "utf8"), /Latest update \(v1\.1\.2\)/);
+    assert.match(readFileSync(join(project, "CLAUDE.md"), "utf8"), /Latest update \(v1\.1\.2\)/);
   } finally { rmSync(project, { recursive: true, force: true }); }
+});
+
+test("bash installer avoids heredoc command substitution rejected by macOS Bash 3.2", () => {
+  const installer = readFileSync(BASH_INSTALLER, "utf8");
+  assert.doesNotMatch(
+    installer,
+    /CLAUDE_SECTION="\$\(cat <<'/,
+    "Bash 3.2 misparses apostrophes inside a quoted heredoc nested in command substitution",
+  );
 });
